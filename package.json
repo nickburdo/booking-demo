@@ -1,0 +1,10 @@
+{
+  "name": "booking-demo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "generate": "pnpm --filter web generate",
+    "preview": "pnpm --filter web preview",
+    "deploy": "pnpm --filter web deploy"
+  }
+}

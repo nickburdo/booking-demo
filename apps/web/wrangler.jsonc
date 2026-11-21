@@ -1,0 +1,14 @@
+// Cloudflare Workers config: static assets only (no Worker script). See plan step 7.1, ADR-004.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "booking-demo-web",
+  "compatibility_date": "2026-11-18",
+  "assets": {
+    // Output of `nuxt generate`
+    "directory": "./.output/public",
+    // Unknown paths get 404.html with HTTP 404
+    "not_found_handling": "404-page",
+    // /ru and /uk without a trailing slash, /ru/ redirects to /ru (R2)
+    "html_handling": "drop-trailing-slash"
+  }
+}

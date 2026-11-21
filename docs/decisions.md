@@ -44,13 +44,20 @@ has confirmed it in discussion.
 - **Decision:** `docs/` is updated and the version plan approved before code is written.
   Deviations from an approved plan go back through plan revision.
 
-## ADR-006 — Three languages, URL prefix strategy
+## ADR-006 — Three languages, English at the root, remembered choice
 
-- **Status:** Accepted (2026-11-21)
-- **Decision:** `@nuxtjs/i18n`, locales `en` (default), `ru`, `uk`; strategy `prefix`;
-  browser language detection with cookie, redirect on root only (`redirectOn: 'root'`).
-- **Consequences:** Every page exists as `/en/…`, `/ru/…`, `/uk/…`. All UI text and content
-  must exist in three languages.
+- **Status:** Accepted (2026-11-21); revised 2026-11-21 (v1 plan, revision R1, approved)
+- **Original decision:** strategy `prefix` with browser detection and redirect on `/`.
+  Rejected after step 2.6: on a static host `/` has no page and answers HTTP 404 before a
+  client-side redirect.
+- **Decision:** `@nuxtjs/i18n`, locales `en` (default), `ru`, `uk`; strategy
+  `prefix_except_default` (`/` = English, `/ru`, `/uk`); no browser-language detection.
+  The language chosen with the switcher is saved in `localStorage`; on app start, only on the
+  English (unprefixed) URL, the app switches to the saved language. Direct `/ru` / `/uk` links
+  are never overridden.
+- **Consequences:** All pages answer HTTP 200 without redirects. Returning RU/UK visitors briefly
+  see the English page before the switch (accepted). All UI text and content must exist in
+  three languages.
 
 ## ADR-007 — Map: Leaflet + OpenStreetMap
 

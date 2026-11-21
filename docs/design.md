@@ -1,0 +1,142 @@
+# Design — Linden Coffee landing
+
+**Status:** Confirmed by the user (2026-11-21, v1 plan, step 3.2)
+**Direction:** B2 "Podil poster, photo" — chosen by the user in step 3.1 (D12).
+
+Bold, graphic, urban: an oversized wide headline over a full-bleed café photo,
+clean menu rows, one cobalt action colour and a young-linden accent.
+
+## 1. Palette
+
+Defined once as Tailwind theme tokens (`@theme` in `app/assets/css/main.css`, step 3.3),
+used as classes such as `bg-milk`, `text-espresso`, `bg-cobalt`.
+
+| Token | Hex | Role |
+|---|---|---|
+| `--color-milk` | `#F7F7F2` | Page background; text on the hero photo |
+| `--color-espresso` | `#2A1A12` | Main text; hero photo fallback; gradient base |
+| `--color-cobalt` | `#2D4FC2` | Buttons, links, focus ring |
+| `--color-linden` | `#D4DE6A` | Accent only (see rules below) |
+| `--color-steam` | `#6F746B` | Secondary text (notes, captions) |
+| `--color-line` | `#DCDDD4` | Hairlines between menu / hours rows |
+
+Rules:
+- **Linden is never text on a light background** (too low contrast). It is used as:
+  the tagline on the dark hero, the 4px underline of menu category headings,
+  and the active-language pill (with espresso text).
+- **Cobalt is the only action colour.** Buttons are cobalt with white text;
+  links are cobalt on milk.
+- White on cobalt and espresso on milk both pass WCAG AA for body text.
+
+## 2. Typography
+
+| Family | Weights | Use |
+|---|---|---|
+| **Unbounded** | 900, 700, 400 | Hero name (900), section headings and brand (700), sub-headings (400) |
+| **Golos Text** | 400, 500, 600 | Body, navigation, buttons, prices |
+
+Both fonts have Cyrillic, so EN / RU / UK look the same.
+
+**Source:** self-hosted from npm packages
+`@fontsource-variable/unbounded` and `@fontsource-variable/golos-text` (v5.3.0, OFL-1.1),
+imported in CSS, instead of a Google Fonts `<link>`.
+Why: no request to Google from the visitor's browser (privacy) and no third-party
+dependency at runtime; the font files ship with the site.
+
+Type scale (desktop → mobile where different):
+
+| Element | Size | Line height / tracking |
+|---|---|---|
+| Hero name | `clamp(64px, 15vw, 210px)` | 0.85 / −0.03em; one line per word |
+| Hero tagline | `clamp(17px, 5.2vw, 24px)`, weight 500 | always one line (`nowrap`) |
+| Section heading (h2) | 40px → 30px | Unbounded 700 |
+| Sub-heading (h3) | 20px | Unbounded 400 |
+| Body | 17px | 1.55 |
+| Small / notes | 15px | steam colour |
+| Prices | body size, weight 600 | tabular figures |
+
+## 3. Hero photo
+
+- **Photo:** round wooden table with a French press among plants (photo 1 from step 3.1).
+- **Author:** Kris Atomic, on Unsplash —
+  https://unsplash.com/photos/round-brown-wooden-table-with-french-press-on-top-with-white-ceramic-teacup-beside-3b2tADGAWnU
+- **Licence:** Unsplash License (free to use, attribution not required).
+  We credit the author in the footer anyway (one short line next to the demo note).
+- **File:** downloaded once (with the user's permission, step 5.3), converted to WebP,
+  stored in the repo at `apps/web/public/images/hero-1200.webp` and `hero-2400.webp`
+  (target ≤ 300 KB for the larger one), served via `srcset`. No hotlinking.
+- **Treatment:** `object-fit: cover`, full width, height `min(88vh, 820px)`;
+  espresso gradient from the bottom (90% → 60% at 45% → 15% at 85%) so the milk-white
+  headline is readable; espresso background shows while the photo loads.
+- **Alt text:** empty (`alt=""`) — the photo is decorative; the name and tagline are real text.
+
+## 4. Layout and spacing
+
+- **Spacing scale:** Tailwind default (4px steps). No custom scale.
+- **Container:** max width 1200px, side padding 24px (16px below 400px).
+- **Section padding:** 72px top / 88px bottom on desktop, 48px / 56px on mobile.
+- **Alignment:** everything left-aligned; no centred text blocks.
+- **Radii:** buttons 10px, language pill 6px; sections and photo have no radius.
+- **Shadows:** none.
+
+## 5. Breakpoints
+
+Mobile-first, Tailwind default breakpoints:
+
+| Width | Changes |
+|---|---|
+| < 768px | One-column menu; header shows brand + "Menu" button (mobile menu) |
+| ≥ 768px (`md`) | Menu in three columns; location in two columns (text + map) |
+| ≥ 1024px (`lg`) | Full header: navigation, language switcher, "Book a table" button |
+
+The mockup switched at 820px; using Tailwind's `md`/`lg` instead avoids a custom
+breakpoint, and the full header needs ~1000px to fit without crowding.
+Checked widths in step 6.1: 375, 768, 1280.
+
+## 6. Components
+
+- **Button (primary):** cobalt background, white Golos 600, padding 14px × 24px, radius 10px.
+  Hover: slightly darker cobalt. Focus: 2px cobalt ring with 2px offset (milk gap).
+- **Language switcher:** `EN RU UK`, Golos 500 15px; the active one sits on a linden pill
+  with espresso text; others are plain links.
+- **Menu row:** name left, price right, 10px vertical padding, 1px `line` border on top.
+- **Menu category heading:** Unbounded 400 20px with a 4px linden underline.
+- **Hours row:** same as a menu row (days left, time right).
+- **Map:** full column width, 360px tall (280px on mobile), no radius, OSM attribution visible.
+- **Booking "coming soon":** espresso background section, milk text,
+  heading in Unbounded 700 with the linden colour — repeats the hero contrast at the
+  end of the page. No button (nothing to book yet).
+
+## 7. Section order
+
+1. Header (brand, nav, language switcher, "Book a table")
+2. Hero (photo, name, tagline, address, "Book a table")
+3. Menu
+4. Hours
+5. Location (address + map)
+6. Booking — coming soon
+7. Footer (demo note, photo credit, repo link)
+
+## 8. Motion
+
+None on load. Only state changes the user triggers: button hover/focus, the
+mobile menu opening, and (R5) **smooth scrolling** to a section after an anchor link
+(CSS `scroll-behavior: smooth` on `html`, only under `prefers-reduced-motion: no-preference`;
+with reduced motion the jump is instant).
+
+## 9. Sticky header (R5)
+
+The header stays at the top of the viewport at every width, so navigation, the language
+switcher and "Book a table" are reachable from anywhere on the page.
+- Milk background with a 1px `line` border at the bottom (no shadow, §4).
+- Stacks above the map (Leaflet controls use z-index up to 1000).
+- Sections get `scroll-margin-top` equal to the header height, so an anchor jump does not
+  hide the section heading under the header.
+- The mobile navigation panel scrolls inside itself if it is taller than the screen.
+
+## Decisions confirmed with this document
+
+1. Fonts self-hosted via `@fontsource-variable/*` instead of Google Fonts (§2).
+2. Breakpoints `md` 768 / `lg` 1024 instead of the mockup's 820 (§5).
+3. Photo credit line in the footer although the licence does not require it (§3).
+4. Booking teaser on an espresso background without a button (§6).

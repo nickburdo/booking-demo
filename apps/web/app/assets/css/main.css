@@ -1,0 +1,94 @@
+/* Self-hosted variable fonts (docs/design.md §2, D14). unicode-range in these files
+   means the browser downloads only the subsets a page actually uses. */
+@import "@fontsource-variable/unbounded";
+@import "@fontsource-variable/golos-text";
+
+@import "tailwindcss";
+
+/* Design tokens from docs/design.md. Each token becomes Tailwind utilities,
+   e.g. --color-cobalt → bg-cobalt / text-cobalt, --font-display → font-display. */
+@theme {
+  /* Palette (§1) */
+  --color-milk: #F7F7F2;
+  --color-espresso: #2A1A12;
+  --color-cobalt: #2D4FC2;
+  --color-linden: #D4DE6A;
+  --color-steam: #6F746B;
+  --color-line: #DCDDD4;
+
+  /* Typography (§2): Golos Text replaces the default sans stack, so body text uses it everywhere */
+  --font-sans: "Golos Text Variable", system-ui, sans-serif;
+  --font-display: "Unbounded Variable", "Golos Text Variable", system-ui, sans-serif;
+}
+
+/* Page-wide defaults (§2, §4) */
+@layer base {
+  /* Base size is set on body, not html, so rem-based Tailwind spacing keeps its 4px steps */
+  body {
+    background-color: var(--color-milk);
+    color: var(--color-espresso);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+}
+
+/* Page container (docs/design.md §4): max 1200px, 24px side padding, 16px below 400px */
+@utility page-container {
+  margin-inline: auto;
+  max-width: 1200px;
+  padding-inline: 1.5rem;
+  @media (width < 400px) {
+    padding-inline: 1rem;
+  }
+}
+
+/* Section spacing (§4): 48/56px on mobile, 72/88px from md */
+@utility section-pad {
+  padding-top: 3rem;
+  padding-bottom: 3.5rem;
+  @variant md {
+    padding-top: 4.5rem;
+    padding-bottom: 5.5rem;
+  }
+}
+
+/* Primary button (docs/design.md §6) */
+@utility btn-primary {
+  display: inline-block;
+  border-radius: 10px;
+  background-color: var(--color-cobalt);
+  padding: 14px 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-cobalt) 85%, black);
+  }
+}
+
+/* Visible keyboard focus everywhere: 2px cobalt ring with a 2px gap (§6) */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+  }
+}
+
+/* Smooth scrolling to sections after anchor links (docs/design.md §8, R5).
+   Only when the visitor has not asked the system to reduce motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Sticky header height (docs/design.md §9, R5): sections stop below the header after an anchor jump */
+@layer base {
+  :root {
+    --header-height: 4.5rem;
+  }
+}
+
+@utility anchor-offset {
+  scroll-margin-top: var(--header-height);
+}
