@@ -44,8 +44,14 @@ export default defineNuxtPlugin((nuxtApp) => {
       return
     }
     const saved = readSavedLocale()
-    if (isRestorable(saved)) {
-      await navigateTo(switchLocalePath(saved), { replace: true })
+    if (!isRestorable(saved)) {
+      return
+    }
+    // Unknown URLs (the 404 page) have no localized twin: switchLocalePath returns ''
+    // and navigateTo('') would land on '/'. Keep the 404 page instead (plan revision R7.1).
+    const target = switchLocalePath(saved)
+    if (target) {
+      await navigateTo(target, { replace: true })
     }
   })
 })

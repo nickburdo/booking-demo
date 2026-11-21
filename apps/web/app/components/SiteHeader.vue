@@ -7,8 +7,9 @@ const localePath = useLocalePath()
 
 const sections = ['menu', 'hours', 'location', 'booking'] as const
 
-// switchLocalePath keeps the current hash (#menu etc.), so the switcher stays on the
-// section the visitor is looking at (plan step 5.2). The server never sees the hash,
+// switchLocalePath keeps the current URL hash (#menu etc.), so after switching the page
+// returns to the last section reached via a link (plan step 5.2). It is not the section
+// currently in view: plain scrolling does not change the hash. The server never sees the hash,
 // so links get it only after hydration; otherwise opening /#menu directly causes a
 // hydration mismatch.
 const hydrated = ref(false)
@@ -68,7 +69,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         type="button"
         class="rounded-lg bg-espresso p-2.5 text-milk lg:hidden"
         :aria-expanded="menuOpen"
-        aria-controls="mobile-nav"
+        :aria-controls="menuOpen ? 'mobile-nav' : undefined"
         :aria-label="menuOpen ? t('nav.close') : t('nav.open')"
         @click="menuOpen = !menuOpen"
       >

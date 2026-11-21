@@ -6,6 +6,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n', '@nuxtjs/leaflet'],
   css: ['~/assets/css/main.css'],
+  // Global head: applies to every page, including the 404 error page (plan revision R7.6).
+  app: {
+    head: {
+      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    },
+  },
   vite: {
     plugins: [tailwindcss()],
   },
