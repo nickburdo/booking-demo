@@ -1,7 +1,7 @@
 // Site-level links that are not coffee-shop content (see docs/design.md §3, plan steps 5.8, 8.4).
 
 /** Public GitHub repository; filled in at plan step 8.4. The footer hides the link while it is null. */
-export const repoUrl: string | null = null
+export const repoUrl: string | null = 'https://github.com/nickburdo/booking-demo'
 
 /** Hero photo credit (Unsplash License, D13). */
 export const heroPhotoCredit = {

@@ -1,6 +1,6 @@
 # v1 plan — Landing page
 
-- **Status:** Done (2026-11-21) — live at https://booking-demo-web.nick-burdo.workers.dev; revisions R1–R6 approved and implemented; step 8.4 (GitHub) follows
+- **Status:** Done (2026-11-21) — live at https://booking-demo-web.nick-burdo.workers.dev; revisions R1–R6 approved and implemented; repo https://github.com/nickburdo/booking-demo
 - **Scope:** stage 0 of the roadmap (`docs/overview.md`): one-page site with menu, opening
   hours, map, "booking coming soon" section; EN/RU/UK; responsive; deployed to Cloudflare.
 - **Out of scope:** any backend, database, booking logic, forms, chat, analytics,

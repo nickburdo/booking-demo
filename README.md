@@ -4,7 +4,8 @@ A demo website for a fictional coffee shop in Kyiv, built step by step to learn 
 online table booking (and, later, online purchase) works end to end.
 The coffee shop is invented; the booking mechanics are the real subject.
 
-**Live:** https://booking-demo-web.nick-burdo.workers.dev
+**Live:** https://booking-demo-web.nick-burdo.workers.dev  
+**Source:** https://github.com/nickburdo/booking-demo
 
 ## Status
 
