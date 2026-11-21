@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "title": "Linden Coffee — coffee shop in Podil, Kyiv",
+    "description": "Slow coffee under the lindens in Podil, Kyiv. Menu, opening hours and how to find us."
+  },
+  "nav": {
+    "menu": "Menu",
+    "hours": "Hours",
+    "location": "Location",
+    "booking": "Booking",
+    "open": "Open navigation",
+    "close": "Close navigation"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "cta": {
+    "book": "Book a table"
+  },
+  "menu": {
+    "title": "Menu",
+    "currency": "UAH",
+    "note": "Prices in hryvnias (UAH)."
+  },
+  "hours": {
+    "title": "Opening hours"
+  },
+  "days": {
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "sun": "Sunday"
+  },
+  "location": {
+    "title": "How to find us",
+    "mapLabel": "Map showing where Linden Coffee is"
+  },
+  "booking": {
+    "title": "Table booking",
+    "text": "Online booking is coming soon. Until then, just drop in."
+  },
+  "footer": {
+    "demo": "This is a demo project: the coffee shop is fictional.",
+    "photoCredit": "Photo: {author} / Unsplash",
+    "repo": "Source code on GitHub"
+  }
+}

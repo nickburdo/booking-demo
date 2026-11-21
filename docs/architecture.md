@@ -42,8 +42,9 @@ booking-demo/
 
 - Nuxt 4, `nuxt generate` (static site generation), output `.output/public`.
 - Deployed as a Cloudflare Worker with static assets only (no Worker script).
-- i18n: `@nuxtjs/i18n`, locales `en` (default), `ru`, `uk`, strategy `prefix`
-  (`/en`, `/ru`, `/uk`); browser language detection on the root path only.
+- i18n: `@nuxtjs/i18n`, locales `en` (default), `ru`, `uk`, strategy `prefix_except_default`
+  (`/`, `/ru`, `/uk`); no browser detection; the chosen language is remembered in
+  `localStorage` and restored on the English URL only (ADR-006).
 - Styling: Tailwind CSS v4 via `@tailwindcss/vite`, own components.
 - Map: Leaflet via `@nuxtjs/leaflet`, OpenStreetMap tiles, rendered client-side only.
 - Content (menu, hours, address) comes from a typed data file in the app,

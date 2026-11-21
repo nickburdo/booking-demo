@@ -31,6 +31,14 @@ the app's data file mirrors it.
 
 ## Menu (prices in UAH)
 
+Category names (added in v1 step 4.1):
+
+| EN | UK | RU |
+|---|---|---|
+| Coffee | Кава | Кофе |
+| Not coffee | Не кава | Не кофе |
+| Breakfast & pastry | Сніданки та випічка | Завтраки и выпечка |
+
 ### Coffee
 | EN | UK | RU | Price |
 |---|---|---|---|

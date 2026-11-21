@@ -1,6 +1,6 @@
 # v1 plan — Landing page
 
-- **Status:** Approved (2026-11-21)
+- **Status:** Approved (2026-11-21); revisions R1–R6 approved (2026-11-21)
 - **Scope:** stage 0 of the roadmap (`docs/overview.md`): one-page site with menu, opening
   hours, map, "booking coming soon" section; EN/RU/UK; responsive; deployed to Cloudflare.
 - **Out of scope:** any backend, database, booking logic, forms, chat, analytics,
@@ -14,7 +14,7 @@
 |---|---|---|
 | D1 | One version per stage; this is v1 | ADR-002 |
 | D2 | Nuxt 4 static generation, served as Workers static assets | ADR-003, ADR-004 |
-| D3 | `@nuxtjs/i18n`, `en` (default) / `ru` / `uk`, `prefix` strategy, detect on root | ADR-006 |
+| D3 | ~~`prefix` strategy, detect on root~~ → **R1:** `prefix_except_default` (`/` = EN, `/ru`, `/uk`), no browser detection, chosen language remembered in `localStorage` | ADR-006 (rev. R1) |
 | D4 | Leaflet + OSM via `@nuxtjs/leaflet` | ADR-007 |
 | D5 | Tailwind CSS v4 via `@tailwindcss/vite`, own components | ADR-008 |
 | D6 | "Book a table" button → "coming soon" section | ADR-010 |
@@ -23,9 +23,93 @@
 | D9 | Content from `docs/cafe.md` | ADR-001 |
 | D10 | Docs written in English (public portfolio repo) | user, plan approval |
 | D11 | Git: docs committed on `main`; v1 work on branch `feature/v1-landing` | user, plan approval |
-| D12 | Visual direction chosen by the user from mockups in step 3.1 | user, plan approval |
+| D12 | Visual direction chosen by the user from mockups in step 3.1 → B2 "Podil poster, photo" (`docs/design.md`) | user, plan approval |
+| D13 | Hero stock photo (Unsplash, Kris Atomic), stored as WebP in the repo, credited in the footer | R3 (approved) |
+| D14 | Fonts self-hosted via `@fontsource-variable/*` (Unbounded, Golos Text) | R3 (approved) |
 
-## Known risk to verify early
+## Revision R1 (2026-11-21) — root path and language persistence
+
+**Trigger:** step 2.6 confirmed the known risk below. With `prefix`, `nuxt generate` emits no
+page for `/`. Checked under local `wrangler dev` with `not_found_handling: "404-page"`: `/` is
+served `404.html` with **HTTP 404**, Nuxt then redirects client-side (`/en` for an EN browser,
+`/ru` with cookie `ru`). Functionally OK, but the main URL answers 404 (bad for search engines
+and link previews) and a blank page flashes before the redirect.
+
+**Options considered:** (A) keep as is; (B) `_redirects` rule `/ → /en` (no language detection);
+(C) tiny Worker on `/` only (`run_worker_first: ["/"]`) redirecting by cookie/`Accept-Language`;
+(D) `prefix_except_default`.
+
+**Decision (user):** D, with these rules:
+- `/` is the English page; Russian and Ukrainian are `/ru` and `/uk`.
+- No browser-language detection (`detectBrowserLanguage: false`): a first visit is always English;
+  the user switches with the language switcher.
+- The chosen language is saved to `localStorage` on every switch.
+- On app start, **only when the URL is the English (unprefixed) page** and the saved language is
+  `ru` or `uk`, the app switches to the saved language (history `replace`). A direct link to
+  `/ru` or `/uk` always opens as is and is never overridden.
+- Accepted trade-off: a returning RU/UK visitor briefly sees the English page before the switch,
+  because `localStorage` is readable only in the browser after the static page loads.
+
+**Plan changes:** step 2.4 re-done (config), step 2.6 re-verified, new step 2.7, step 6.2
+extended. Steps 0.1–2.5 are already done and are not affected otherwise.
+
+## Revision R2 (2026-11-21) — trailing slash on locale pages
+
+**Trigger:** step 2.6-R1 under local `wrangler dev`: `/` → 200, but `/ru` and `/uk` → **307**
+to `/ru/` and `/uk/`. Cause: Workers static assets default `html_handling: auto-trailing-slash`
+serves folder `index.html` files with a trailing slash, while Nuxt links use `/ru` without one.
+
+**Decision (user):** add `"html_handling": "drop-trailing-slash"` to the Wrangler config
+(step 7.1). Verified in a temporary config: `/`, `/ru`, `/uk` → 200 with the right language;
+`/ru/` → 307 to `/ru` (single canonical URL); `/en` and unknown paths → 404.
+Rejected alternative: changing Nuxt output to `ru.html` files (alters the build, less obvious).
+
+## Revision R3 (2026-11-21) — design: hero photo, self-hosted fonts (approved)
+
+**Trigger:** step 3.1/3.2. The user chose direction B with a full-bleed photo instead of the
+plain colour block (B2), and confirmed `docs/design.md`. Three things in it are not covered by
+the original steps.
+
+**Changes:**
+- **D13 (new):** hero uses one stock photo — Unsplash, author Kris Atomic, Unsplash License;
+  stored in the repo as WebP (no hotlinking); author credited in the footer.
+- **D14 (new):** fonts Unbounded + Golos Text self-hosted from npm
+  (`@fontsource-variable/unbounded`, `@fontsource-variable/golos-text`), no Google Fonts request.
+- **Step 3.3** extended: install the two font packages, import them in `main.css`.
+- **Step 5.3** extended: download the photo (ask first: file, source, size), convert to
+  `hero-1200.webp` and `hero-2400.webp` (≤ 300 KB for the larger), place in
+  `apps/web/public/images/`, render with `srcset` and the gradient from `docs/design.md` §3.
+- **Step 5.8** extended: one-line photo credit with a link to the photo page.
+
+Steps 0.1–3.2 are done and not affected.
+
+## Revision R4 (2026-11-21) — absolute URLs for SEO links (approved)
+
+**Trigger:** step 5.9. `useLocaleHead` produces `hreflang` alternates and the canonical link,
+but without the i18n `baseUrl` option they are relative (`/ru`), and the module warns
+"I18n `baseUrl` is required to generate valid SEO tag links". Search engines expect absolute URLs.
+The site's address is known only after the first deploy (`*.workers.dev` subdomain).
+
+**Change:** step 7.3 extended — after the first deploy, set `i18n.baseUrl` in `nuxt.config.ts`
+to the live URL, redeploy, and check that the generated HTML has absolute `hreflang` and
+canonical links.
+
+## Revision R5 (2026-11-21) — smooth scrolling and sticky header (approved)
+
+**Trigger:** user review of the finished landing (after Phase 6).
+**Decision (user):** smooth scrolling between sections, option A — CSS `scroll-behavior: smooth`
+under `prefers-reduced-motion: no-preference` (rejected: Nuxt `scrollBehaviorType: 'smooth'`,
+which ignores reduced motion); and a header fixed at the top so navigation and booking are
+reachable from anywhere. Details in `docs/design.md` §8–9.
+
+**Plan changes:** new step 5.2-R5; steps 6.1–6.3 re-run for the header and anchor jumps.
+
+## Revision R6 (2026-11-21) — commit before the first deploy (approved)
+
+**Decision (user):** commit the v1 work on `feature/v1-landing` before Phase 7, so the deployed
+site matches a known commit. Step 8.3 still commits the README/docs updates and merges to `main`.
+
+## Known risk to verify early (resolved by R1)
 
 **Root path `/` with `prefix` strategy on a static host.** With `prefix`, there is no
 unprefixed page, and a static host has no server to redirect `/` → `/en`. The expectation is
@@ -84,6 +168,11 @@ then, e.g. a static redirect rule or a tiny Worker script).
   with one test key.
 - **Done when:** `/en`, `/ru`, `/uk` each show the test key in their language.
 
+### 2.4-R1 Switch i18n to `prefix_except_default`
+- In `nuxt.config.ts`: `strategy: 'prefix_except_default'`, `detectBrowserLanguage: false`
+  (other i18n settings unchanged).
+- **Done when:** `/` shows the EN test key, `/ru` and `/uk` show theirs; `/en` is not a page.
+
 ### 2.5 Add `@nuxtjs/leaflet`
 - Install the module (no map rendered yet).
 - **Done when:** dev server starts without errors.
@@ -94,6 +183,28 @@ then, e.g. a static redirect rule or a tiny Worker script).
   to RU and to an unsupported language.
 - **Done when:** `/` → `/ru` for RU browser, `/` → `/en` for unsupported language; direct
   `/uk` opens without redirect. **If not — stop, revise plan (see Known risk).**
+- **Result:** not met → Revision R1.
+
+### 2.6-R1 Re-verify static generation
+- `nuxt generate`; check `.output/public` has `index.html` (EN), `ru/index.html`, `uk/index.html`.
+- Serve with local `wrangler dev` (same assets settings as step 7.1).
+- **Done when:** `/`, `/ru`, `/uk` answer HTTP 200 with the right language and no redirect.
+- **Result:** met with the R2 setting (`drop-trailing-slash`); without it `/ru`, `/uk` → 307.
+
+### 2.7 Remember the chosen language (`localStorage`)
+- Client-only Nuxt plugin `app/plugins/remember-locale.client.ts`:
+  - on a user-initiated locale switch (i18n `beforeLocaleSwitch` hook with
+    `initialSetup === false`) → save the new locale code to `localStorage` under key `locale`.
+    The initial locale setup on page load is **not** saved, so merely opening a direct `/uk`
+    link does not change the remembered language (approved with R1);
+  - on app start → if the current locale is `en` (unprefixed URL) and the saved value is
+    `ru` or `uk`, navigate to the same page in the saved locale with `replace`;
+  - all `localStorage` access wrapped in `try/catch` (private mode / blocked storage → behave as
+    if nothing is saved); unknown saved values ignored.
+- **Done when:** (a) fresh visit to `/` stays EN; (b) switch to RU, reload `/` → `/ru`;
+  (c) with RU saved, open `/uk` directly → stays `/uk`, and saved value is still `ru`;
+  (d) switch to EN, reload `/` → stays EN;
+  (e) checked both in dev and in the generated build under `wrangler dev`.
 
 ## Phase 3 — Visual direction
 
@@ -109,7 +220,10 @@ then, e.g. a static redirect rule or a tiny Worker script).
 
 ### 3.3 Apply design tokens
 - Tailwind theme variables (`@theme`) and font loading according to `docs/design.md`.
-- **Done when:** tokens usable as Tailwind classes in the dev server.
+- (R3) Install `@fontsource-variable/unbounded` and `@fontsource-variable/golos-text` in
+  `apps/web`; import them in `main.css`; register both families as theme font tokens.
+- **Done when:** tokens usable as Tailwind classes in the dev server; both fonts load from
+  the site itself (no request to fonts.googleapis.com), Cyrillic renders in them.
 
 ## Phase 4 — Content and translations
 
@@ -135,9 +249,20 @@ then, e.g. a static redirect rule or a tiny Worker script).
   (keeps current section anchor), "Book a table" button; mobile menu toggle.
 - **Done when:** works at 375 px and 1280 px; switcher changes URL prefix.
 
+### 5.2-R5 Sticky header and smooth scrolling
+- Header `position: sticky` at the top (all widths) per `docs/design.md` §9; sections get
+  `scroll-margin-top` = header height; mobile panel scrolls inside if too tall.
+- `html { scroll-behavior: smooth }` inside `@media (prefers-reduced-motion: no-preference)`.
+- **Done when:** at 375 and 1280 px, anchor links (mouse and keyboard) scroll smoothly and the
+  section heading is visible below the header; with reduced motion emulated the jump is instant;
+  the header stays above the map; no horizontal scroll.
+
 ### 5.3 Hero
 - Name, tagline, "Book a table" CTA → booking section.
-- **Done when:** renders in all 3 languages.
+- (R3) Full-bleed photo per `docs/design.md` §3: download it (ask first), convert to
+  `hero-1200.webp` / `hero-2400.webp` in `apps/web/public/images/`, `srcset`, bottom gradient,
+  espresso fallback background, `alt=""`.
+- **Done when:** renders in all 3 languages; tagline on one line at 375 px; larger WebP ≤ 300 KB.
 
 ### 5.4 Menu section
 - Categories with items and prices (UAH) from `cafe.ts`.
@@ -159,6 +284,7 @@ then, e.g. a static redirect rule or a tiny Worker script).
 ### 5.8 Footer
 - Name, address, "This is a demo project — the coffee shop is fictional" note,
   link to the GitHub repo (filled in at step 8.4).
+- (R3) Photo credit: "Photo: Kris Atomic / Unsplash" linking to the photo page.
 - **Done when:** renders in all 3 languages.
 
 ### 5.9 SEO and document head
@@ -176,6 +302,8 @@ then, e.g. a static redirect rule or a tiny Worker script).
 ### 6.2 Interaction check
 - Anchor navigation by click and keyboard (Tab/Enter), language switch, map interaction
   by mouse and touch emulation.
+- (R1) Language memory: repeat checks (a)–(d) of step 2.7 on the final page with the real
+  language switcher.
 - **Done when:** all work; issues fixed within this plan's scope or raised for discussion.
 
 ### 6.3 Production build check
@@ -187,7 +315,8 @@ then, e.g. a static redirect rule or a tiny Worker script).
 ### 7.1 Wrangler setup
 - Add `wrangler` as a dev dependency of `apps/web`; `apps/web/wrangler.jsonc`:
   `name: "booking-demo-web"`, current `compatibility_date`,
-  `assets.directory: "./.output/public"`, `assets.not_found_handling: "404-page"`.
+  `assets.directory: "./.output/public"`, `assets.not_found_handling: "404-page"`,
+  `assets.html_handling: "drop-trailing-slash"` (R2).
 - **Done when:** `wrangler deploy --dry-run` succeeds.
 
 ### 7.2 Cloudflare login (user)
@@ -198,6 +327,8 @@ then, e.g. a static redirect rule or a tiny Worker script).
 - `pnpm --filter web deploy` (= generate + `wrangler deploy`). Ask before running.
 - **Done when:** the site is live at `https://booking-demo-web.<subdomain>.workers.dev`;
   `/`, `/en`, `/ru`, `/uk` and an unknown path (404 page) behave as locally.
+- (R4) Set `i18n.baseUrl` to the live URL in `nuxt.config.ts`; redeploy (ask first).
+  **Done when (R4):** generated HTML has absolute `hreflang` and canonical links.
 
 ## Phase 8 — Wrap-up
 
@@ -209,7 +340,7 @@ then, e.g. a static redirect rule or a tiny Worker script).
 - This plan: status → Done, with notes on any approved revisions.
 
 ### 8.3 Merge to `main`
-- Commit; merge `feature/v1-landing` into `main` (ask first).
+- (R6) The v1 code is already committed before Phase 7; here commit the Phase 8 changes; merge `feature/v1-landing` into `main` (ask first).
 
 ### 8.4 Publish to GitHub
 - Create public repo `booking-demo` with `gh`, push `main` (ask first); put the repo link
