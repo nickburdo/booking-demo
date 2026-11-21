@@ -221,3 +221,24 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 ### 6.2 README (how to run with `.env` / `.dev.vars`, Telegram/Turnstile setup), `docs/architecture.md`
   (v3 implemented, learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first).
+
+## Revision R1 (2026-11-21) — local site config must not reach the production build (approved)
+
+**Trigger:** after Phase 3, `nuxt generate` was found to read `apps/web/.env` too: the build
+baked in `apiBase: "http://localhost:8787"` and the Turnstile test site key. `pnpm deploy`
+would have shipped them. Nothing was deployed.
+
+**Decision (user):** local values live in `apps/web/.env.local`, loaded only explicitly:
+- `dev` script → `nuxt dev --dotenv .env.local`;
+- new `generate:local` script → `nuxt generate --dotenv .env.local` (local built-site checks);
+- `generate` / `deploy` load no env file, so they use the live defaults from `nuxt.config.ts`;
+- `.env.example` (committed) now says "copy to `.env.local`".
+Rejected: setting `NUXT_PUBLIC_*` in the deploy script (needs `cross-env` on Windows; a plain
+`pnpm generate` would still pick up `.env`).
+
+**Also decided (user):** Phase 4 runs on the built site (`generate:local`) served by
+`wrangler dev` on port 3000 (the only local origin the API allows); the user stops their dev
+server for it.
+
+**Done when:** `pnpm generate` output contains the live `apiBase` and no test site key;
+`generate:local` output contains the local values.

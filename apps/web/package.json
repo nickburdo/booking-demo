@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --dotenv .env.local",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "deploy": "nuxt generate && wrangler deploy"
+    "deploy": "nuxt generate && wrangler deploy",
+    "generate:local": "nuxt generate --dotenv .env.local"
   },
   "dependencies": {
     "@fontsource-variable/golos-text": "5.3.0",
