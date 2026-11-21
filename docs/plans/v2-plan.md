@@ -1,7 +1,7 @@
 # v2 plan — Booking API and database
 
 - **Status:** Done (2026-11-21) — API live at https://booking-demo-api.nick-burdo.workers.dev;
-  62 automated tests green; no plan revisions. Implementation notes are at the end of this file.
+  automated tests green; revision R1 (code review fixes) approved. Notes at the end of this file.
 - **Scope:** stage v2 of the roadmap (`docs/overview.md`): `apps/api` — Express on Cloudflare
   Workers with a D1 database: tables, time slots, reservations, double-booking protection;
   public guest endpoints (availability, create, view, cancel); deployed to `*.workers.dev`.
@@ -420,3 +420,25 @@ No plan revisions were needed. Small ordering/how-to differences inside the appr
   since the services throw/use them.
 - **R-T1, R-T2:** both resolved positively — Express and the rate limiter work in the test
   runtime. **R-T3** handled by the live race run (4 × `201`, tables T5–T8, no duplicate cells).
+
+## Revision R1 (2026-11-21) — code review fixes (approved)
+
+**Trigger:** first code review of `main...feature/v2-api` (before merge, step 7.3).
+4 findings, none in the booking core. User approved all four fixes as proposed.
+
+**Changes:**
+- **R1.1 (important):** body errors raised by `express.json()` other than malformed JSON
+  (`entity.too.large`, unsupported charset/encoding, aborted request) fell through to
+  `500 INTERNAL`. Now: body over 10 KB → `413 PAYLOAD_TOO_LARGE` (new error code); any other
+  client body error (http-errors status < 500) → `400 VALIDATION`. `docs/api.md` updated;
+  integration test added.
+- **R1.2 (nit):** keep the `"unknown"` rate-limit key for requests without `CF-Connecting-IP`
+  (Cloudflare always sets it; only local/test calls lack it) — document why in a code comment.
+- **R1.3 (nit):** `race.mjs` success check: OK only if every response is `201` or `SLOT_TAKEN`
+  and at least one booking succeeded; warn when fewer than 4 succeeded (time already partly
+  booked).
+- **R1.4 (nit):** `race.mjs` validates `--n` (integer 1–10) and counts `429 RATE_LIMITED`
+  separately from other failures.
+
+**Steps:** R1.1–R1.4 implemented and committed on `feature/v2-api`; full suite + typecheck;
+redeploy the API (ask first); re-run the live race script; then 7.3.

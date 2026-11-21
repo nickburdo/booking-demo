@@ -139,6 +139,24 @@ describe("POST /reservations", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: { code: "VALIDATION" } });
   });
+
+  it("answers 413 PAYLOAD_TOO_LARGE for a body over 10 KB", async () => {
+    const res = await postJson("/reservations", booking({ comment: "x".repeat(20_000) }));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ error: { code: "PAYLOAD_TOO_LARGE" } });
+  });
+
+  it("answers 400 VALIDATION for an unreadable body", async () => {
+    const res = await call("/reservations", {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=koi8-r" },
+      body: JSON.stringify(booking()),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { code: "VALIDATION", message: "Request body could not be read." },
+    });
+  });
 });
 
 describe("GET /reservations/:token", () => {

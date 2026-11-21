@@ -26,6 +26,8 @@ app.get("/availability", async (req, res) => {
 });
 
 app.post("/reservations", async (req, res) => {
+  // Cloudflare always sets CF-Connecting-IP in production. Only local/test calls may lack
+  // it; they share the "unknown" bucket, which is acceptable there (v2 plan, R1.2).
   const key = req.get("cf-connecting-ip") ?? "unknown";
   const { success } = await env.CREATE_LIMITER.limit({ key });
   if (!success) {
@@ -60,9 +62,20 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     });
     return;
   }
-  // Malformed JSON body from express.json().
+  // Body errors from express.json() (http-errors with a client status), v2 plan R1.1.
   if (error?.type === "entity.parse.failed") {
     res.status(400).json({ error: { code: "VALIDATION", message: "Body is not valid JSON." } });
+    return;
+  }
+  if (error?.type === "entity.too.large") {
+    res.status(413).json({
+      error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is larger than 10 KB." },
+    });
+    return;
+  }
+  const status = Number(error?.status ?? error?.statusCode);
+  if (status >= 400 && status < 500) {
+    res.status(400).json({ error: { code: "VALIDATION", message: "Request body could not be read." } });
     return;
   }
   console.error(error);

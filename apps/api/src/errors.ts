@@ -5,6 +5,7 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "SLOT_TAKEN"
   | "NOT_CANCELLABLE"
+  | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "INTERNAL";
 

@@ -40,6 +40,8 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
   ```
 
   A body that is not valid JSON → `400 VALIDATION` "Body is not valid JSON." (no `fields`).
+  A body over 10 KB → `413 PAYLOAD_TOO_LARGE`. Any other unreadable body (e.g. unsupported
+  charset) → `400 VALIDATION` "Request body could not be read."
 - **CORS:** browser requests are allowed only from
   `https://booking-demo-web.nick-burdo.workers.dev` and `http://localhost:3000`.
 - **Rate limit:** `POST /reservations` allows 10 requests per 60 seconds per client IP
@@ -55,6 +57,7 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 404 | `NOT_FOUND` | Unknown route, or no reservation for this token |
 | 409 | `SLOT_TAKEN` | No table for this party size is free for the whole 90 minutes |
 | 409 | `NOT_CANCELLABLE` | Reservation already cancelled or already started |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
 | 429 | `RATE_LIMITED` | Too many create requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
 
