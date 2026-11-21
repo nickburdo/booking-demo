@@ -59,10 +59,22 @@ const started = computed(() => {
   if (!r) return false
   return `${r.date} ${r.time}` <= `${kyivToday()} ${kyivTimeNow()}`
 })
-const canCancel = computed(() => reservation.value?.status === 'pending' && !started.value)
-const statusKey = computed(() =>
-  reservation.value?.status === 'cancelled' ? 'cancelled' : started.value ? 'started' : 'pending',
-)
+// v4: confirmed bookings can be cancelled by the guest too (ADR-022).
+const live = computed(() => reservation.value?.status === 'pending' || reservation.value?.status === 'confirmed')
+const canCancel = computed(() => live.value && !started.value)
+const statusKey = computed(() => {
+  const r = reservation.value
+  if (!r) return 'pending'
+  if (r.status === 'cancelled') return r.cancelledBy === 'owner' ? 'cancelledByOwner' : 'cancelled'
+  if (r.status === 'no_show') return 'no_show'
+  if (started.value) return 'started'
+  return r.status
+})
+const pillClass = computed(() => ({
+  pending: 'bg-linden',
+  confirmed: 'bg-linden',
+  no_show: 'bg-[#F3D5D2] text-[#7A1C16]',
+})[statusKey.value as string] ?? 'bg-line')
 
 const confirming = ref(false)
 const cancelling = ref(false)
@@ -130,7 +142,7 @@ async function cancel() {
         <p ref="statusLine" tabindex="-1" class="mt-3 outline-none" aria-live="polite">
           <span
             class="inline-block rounded-md px-2.5 py-1 text-sm font-semibold"
-            :class="statusKey === 'pending' ? 'bg-linden' : 'bg-line'"
+            :class="pillClass"
           >
             {{ t(`reservation.status.${statusKey}`) }}
           </span>
@@ -150,6 +162,14 @@ async function cancel() {
         </dl>
 
         <p v-if="actionError" class="mt-5 text-error" role="alert">{{ actionError }}</p>
+
+        <!-- v4: what the café did with the booking -->
+        <p v-if="reservation.status === 'confirmed' && !started" class="mt-5">{{ t('reservation.confirmedNote') }}</p>
+        <template v-if="statusKey === 'cancelledByOwner'">
+          <p class="mt-5">{{ t('reservation.cancelledByOwnerNote') }}</p>
+          <p v-if="reservation.cancelReason" class="mt-1">{{ t('reservation.reason', { reason: reservation.cancelReason }) }}</p>
+        </template>
+        <p v-if="reservation.status === 'no_show'" class="mt-5">{{ t('reservation.noShowNote') }}</p>
 
         <div v-if="canCancel" class="mt-6">
           <div v-if="confirming" class="flex flex-wrap items-center gap-3">
@@ -173,8 +193,8 @@ async function cancel() {
             <p class="mt-2 text-[15px] text-steam">{{ t('reservation.cancelHint') }}</p>
           </template>
         </div>
-        <p v-else-if="reservation.status === 'cancelled'" class="mt-6">{{ t('reservation.cancelledNote') }}</p>
-        <p v-else-if="started" class="mt-6">{{ t('reservation.startedNote') }}</p>
+        <p v-else-if="statusKey === 'cancelled'" class="mt-6">{{ t('reservation.cancelledNote') }}</p>
+        <p v-else-if="started && live" class="mt-6">{{ t('reservation.startedNote') }}</p>
       </template>
 
       <p class="mt-10">

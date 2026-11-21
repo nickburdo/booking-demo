@@ -126,6 +126,34 @@ Checked widths in step 6.1: 375, 768, 1280.
   "Cancel booking" as an outline button in `error`, then an inline confirm with a solid
   `error` button.
 
+- **Admin (v4, mockup approved in v4 step 3.1):** light milk pages, like the reservation page —
+  a working tool, not the espresso marketing look. Header: brand + espresso "Admin demo" badge,
+  language switcher, "Site" and "Log out" links; 1px `line` border below.
+  - **Login:** left-aligned column (max 420px), heading Unbounded 700; demo box with a 4px
+    linden left border on white, credentials in monospace, "Fill in demo login" outline
+    button; fields white with a 2px `line` border; primary "Log in" (full width on mobile);
+    errors in a box with a 4px `error` left border.
+  - **Day view:** toolbar with ←/→ icon buttons (44px), native date input and "Today"; "Add
+    demo reservations" outline button on the right (below the list on mobile). Day heading
+    Unbounded 400 20px with "N reservations · M guests" in steam. Status filter chips (36px,
+    white with `line` border; selected = espresso with milk text) with counts.
+  - **Rows:** desktop grid — time–end (tabular, 600) · table + guests · masked name / phone
+    (steam) / comment · status · actions on the right; 1px `line` between rows. Mobile: cards
+    (time · table · guests and the status on one line, guest below, actions under them).
+    Cancelled and no-show rows in steam colour. Small "DEMO" tag for demo reservations;
+    "⚠ Telegram not delivered" under the status when the owner was not notified.
+  - **Status pills** (6px radius, 13px 600): waiting = white with a 1.5px espresso border;
+    confirmed = linden; cancelled = `line` grey ("Cancelled by guest / by the café"); no-show =
+    pale red `#F3D5D2` with dark red `#7A1C16` text.
+  - **Actions:** "Confirm" = small primary (cobalt); "Cancel…" = outline in `error`, opens an
+    inline panel under the row: optional reason textarea with a 200-character counter and the
+    hint that the guest sees it, then solid `error` "Cancel reservation" and outline "Keep it";
+    "No-show" = espresso outline (only after the start). Only actions the API allows are shown.
+  - **Empty day:** dashed `line` box with a link to add demo reservations.
+- **Reservation page, v4 states:** "Confirmed" (linden pill, "The café has confirmed your
+  booking"), "Cancelled by the café" (grey pill + the reason), "Marked as no-show" (pale red
+  pill); "Cancel booking" also for confirmed bookings.
+
 ## 7. Section order
 
 1. Header (brand, nav, language switcher, "Book a table")

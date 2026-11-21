@@ -148,6 +148,39 @@
   }
 }
 
+/* Admin pages on milk (v4, docs/design.md §6, Admin) */
+@utility admin-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid var(--color-line);
+  border-radius: 10px;
+  background-color: #fff;
+  padding: 0 14px;
+  color: var(--color-espresso);
+}
+
+@utility admin-icon-btn {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-line);
+  border-radius: 10px;
+  background-color: #fff;
+  font-size: 18px;
+}
+
+@utility admin-outline-btn {
+  border: 2px solid var(--color-espresso);
+  border-radius: 10px;
+  padding: 6px 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 /* Visible keyboard focus everywhere: 2px cobalt ring with a 2px gap (§6) */
 @layer base {
   :focus-visible {

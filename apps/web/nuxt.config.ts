@@ -13,6 +13,9 @@ export default defineNuxtConfig({
       apiBase: 'https://booking-demo-api.nick-burdo.workers.dev',
       // Public Turnstile site key (not a secret; docs/setup-integrations.md).
       turnstileSiteKey: '0x4AAAAAAGL8b1GVwSQwY16N',
+      // Public admin demo login shown on /admin/login (ADR-021). Empty password = no hint.
+      adminDemoUsername: 'demo',
+      adminDemoPassword: 'linden-demo',
     },
   },
   // Global head: applies to every page, including the 404 error page (plan revision R7.6).

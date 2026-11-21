@@ -4,6 +4,7 @@ import { heroPhotoCredit, repoUrl } from '~/data/site'
 
 const { t } = useI18n()
 const localized = useLocalized()
+const localePath = useLocalePath()
 </script>
 
 <template>
@@ -18,6 +19,10 @@ const localized = useLocalized()
     </p>
     <p v-if="repoUrl" class="mt-1">
       <a :href="repoUrl" class="text-cobalt underline underline-offset-2" target="_blank" rel="noopener">{{ t('footer.repo') }}</a>
+    </p>
+    <!-- v4: the admin is a demo feature, so it is linked here, not in the main navigation -->
+    <p class="mt-1">
+      <NuxtLink :to="localePath('/admin/login')" class="text-cobalt underline underline-offset-2">{{ t('footer.admin') }}</NuxtLink>
     </p>
   </footer>
 </template>

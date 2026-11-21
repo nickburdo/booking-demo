@@ -95,7 +95,8 @@
   "footer": {
     "demo": "This is a demo project: the coffee shop is fictional.",
     "photoCredit": "Photo: {author} / Unsplash",
-    "repo": "Source code on GitHub"
+    "repo": "Source code on GitHub",
+    "admin": "Admin demo"
   },
   "reservation": {
     "metaTitle": "Your booking — Linden Coffee",
@@ -106,7 +107,10 @@
     "status": {
       "pending": "Waiting for confirmation",
       "cancelled": "Cancelled",
-      "started": "Started"
+      "started": "Started",
+      "confirmed": "Confirmed",
+      "cancelledByOwner": "Cancelled by the café",
+      "no_show": "Marked as no-show"
     },
     "when": "When",
     "guests": "Guests",
@@ -125,6 +129,95 @@
       "NOT_CANCELLABLE": "This booking can no longer be cancelled.",
       "NETWORK": "No connection to the booking service. Check your internet and try again.",
       "generic": "Something went wrong. Please try again."
+    },
+    "confirmedNote": "The café has confirmed your booking. See you!",
+    "cancelledByOwnerNote": "The café has cancelled this booking.",
+    "reason": "Reason: “{reason}”",
+    "noShowNote": "The café marked that nobody came to this booking."
+  },
+  "admin": {
+    "badge": "Admin demo",
+    "badgeShort": "Demo",
+    "site": "Site",
+    "logout": "Log out",
+    "back": "Back to the site",
+    "guests": "{n} guest | {n} guests",
+    "demoTag": "demo",
+    "reasonShown": "Reason for the guest: “{reason}”",
+    "notNotified": "Telegram not delivered",
+    "noShowQuestion": "Mark as no-show?",
+    "reasonLabel": "Reason for the guest (optional)",
+    "reasonHint": "The guest sees it on their reservation page.",
+    "status": {
+      "pending": "Waiting",
+      "confirmed": "Confirmed",
+      "cancelledByOwner": "Cancelled by the café",
+      "cancelledByGuest": "Cancelled by guest",
+      "no_show": "No-show"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "cancel": "Cancel…",
+      "noShow": "No-show",
+      "noShowYes": "Yes, no-show",
+      "keep": "Keep it",
+      "cancelYes": "Cancel reservation"
+    },
+    "filter": {
+      "all": "All",
+      "pending": "Waiting",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "login": {
+      "metaTitle": "Admin login — Linden Coffee",
+      "title": "Admin",
+      "lead": "Reservations of the café, day by day.",
+      "demo": "{intro} Log in with username {username} and password {password}.",
+      "demoIntro": "This is a public demo.",
+      "masked": "Guest names and phones are partly hidden.",
+      "fill": "Fill in demo login",
+      "username": "Username",
+      "password": "Password",
+      "submit": "Log in",
+      "submitting": "Logging in…",
+      "errors": {
+        "required": "Enter the username and the password.",
+        "INVALID_CREDENTIALS": "Wrong username or password.",
+        "RATE_LIMITED": "Too many attempts. Wait a minute and try again.",
+        "NETWORK": "No connection to the booking service. Check your internet and try again."
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "NOT_ALLOWED": "This action is no longer possible. The list now shows the current state.",
+      "NETWORK": "No connection to the booking service. Try again.",
+      "load": "Could not load the reservations."
+    },
+    "day": {
+      "metaTitle": "Reservations — Linden Coffee admin",
+      "title": "Reservations",
+      "prev": "Previous day",
+      "next": "Next day",
+      "date": "Day",
+      "today": "Today",
+      "summary": "{count} · {guests}",
+      "reservations": "{n} reservation | {n} reservations",
+      "loading": "Loading…",
+      "empty": "No reservations on this day.",
+      "filter": "Filter by status",
+      "noneWithFilter": "No reservations with this status."
+    },
+    "demo": {
+      "add": "Add demo reservations",
+      "added": "Added {n} demo reservation over the next days. | Added {n} demo reservations over the next days.",
+      "hint": "For the demo you can add a few made-up ones:",
+      "errors": {
+        "DEMO_LIMIT": "There are already enough demo reservations (20). Cancel some first.",
+        "RATE_LIMITED": "Too many requests. Wait a minute and try again.",
+        "NETWORK": "No connection to the booking service. Try again."
+      }
     }
   }
 }
