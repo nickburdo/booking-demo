@@ -348,3 +348,34 @@ then, e.g. a static redirect rule or a tiny Worker script).
 - (user, 2026-11-21) Before publishing: MIT `LICENSE` added at the root; Nuxt's starter
   `apps/web/README.md` removed.
 - **Done when:** repo is public, live site footer links to it.
+
+## Revision R7 (2026-11-21) — code review fixes (approved)
+
+**Trigger:** first code review of v1 (`126ff69...af85729`), done after v2. The two findings marked
+important were checked in a browser on the live site. Decisions by the user, 2026-11-21.
+
+**Changes (branch `fix/v1-review`):**
+- **R7.1 (confirmed bug):** with a saved RU/UK choice, an unknown URL (e.g. `/menu-typo`) was
+  replaced by `/` (English home page) instead of showing the 404 page: `switchLocalePath()`
+  returns `''` for a route without a name and `navigateTo('')` goes to `/`. Fix: skip the
+  restore when `switchLocalePath()` returns an empty path.
+- **R7.2 (user decision):** menu prices show the currency next to the number
+  (`55 UAH` / `55 грн`) using the existing `menu.currency` key; the general note
+  "Prices in hryvnias" (`menu.note`) is removed from the page and the locale files.
+- **R7.3 (comment only):** `SiteHeader.vue` comment claimed the language switcher keeps the
+  section in view; it keeps the last clicked hash. Comment corrected; behaviour unchanged.
+- **R7.4 (comment only):** `LocationSection.vue` comment claimed only one-finger panning is off
+  on touch screens; Leaflet `dragging: false` turns off all drag panning (pinch-zoom still
+  works). Comment corrected; behaviour unchanged.
+- **R7.5:** `aria-controls="mobile-nav"` pointed to an element absent from the DOM while the
+  menu is closed (`v-if`); the attribute is now set only when the menu is open.
+- **R7.6 (found while checking R7.1):** the 404 page had no favicon link (`/favicon.ico` → 404),
+  because the link was set in `app.vue`, which the error page does not render. The link moves
+  to `app.head` in `nuxt.config.ts` so every page, including 404, gets it.
+- **Rejected:** "a second click on a section link does nothing" — not reproduced: on the live
+  site repeated clicks on header links and the hero CTA scroll to the section every time.
+
+**Verification:** `nuxt generate` + local `wrangler dev`: R7.1 (saved `uk` + unknown URL shows
+404; `/` still switches to `/uk`), R7.2 in 3 languages at 375 px and 1280 px, R7.5 (attribute
+absent when closed, present when open; toggle by click and keyboard), R7.6 (favicon on 404).
+Then redeploy the site, merge into `main`, push (ask before each).
