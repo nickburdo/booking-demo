@@ -12,5 +12,13 @@
       "database_id": "99200c17-1491-4b60-abf1-75e936aa4b1b",
       "migrations_dir": "migrations"
     }
+  ],
+  // POST /reservations: 10 requests per 60 s per client IP (ADR-015).
+  "ratelimits": [
+    {
+      "name": "CREATE_LIMITER",
+      "namespace_id": "2001",
+      "simple": { "limit": 10, "period": 60 }
+    }
   ]
 }
