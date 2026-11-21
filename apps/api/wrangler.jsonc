@@ -4,5 +4,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-21",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "booking-demo-db",
+      "database_id": "99200c17-1491-4b60-abf1-75e936aa4b1b",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
