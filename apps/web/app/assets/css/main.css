@@ -15,6 +15,9 @@
   --color-linden: #D4DE6A;
   --color-steam: #6F746B;
   --color-line: #DCDDD4;
+  /* Error text (v3, docs/design.md §1): light tone on espresso, dark tone on milk */
+  --color-error-on-dark: #FFB4A6;
+  --color-error: #B3261E;
 
   /* Typography (§2): Golos Text replaces the default sans stack, so body text uses it everywhere */
   --font-sans: "Golos Text Variable", system-ui, sans-serif;
@@ -63,6 +66,85 @@
   color: #fff;
   &:hover {
     background-color: color-mix(in oklab, var(--color-cobalt) 85%, black);
+  }
+}
+
+/* Booking form on the espresso section (v3, docs/design.md §6) */
+@utility step-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  & > span {
+    font-weight: 700;
+    margin-right: 0.5rem;
+  }
+}
+
+@utility field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+@utility field-input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background-color: var(--color-milk);
+  padding: 0 14px;
+  color: var(--color-espresso);
+}
+
+@utility field-input-error {
+  border-color: var(--color-error-on-dark);
+}
+
+@utility field-error {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--color-error-on-dark);
+}
+
+/* Selectable chip (guests, times): a label wrapping a visually hidden radio */
+@utility chip {
+  display: inline-flex;
+  min-width: 48px;
+  height: 44px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid color-mix(in oklab, var(--color-milk) 35%, transparent);
+  border-radius: 10px;
+  padding: 0 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  &:hover {
+    border-color: var(--color-milk);
+  }
+  &:has(input:checked) {
+    border-color: var(--color-linden);
+    background-color: var(--color-linden);
+    color: var(--color-espresso);
+  }
+  &:has(input:focus-visible) {
+    outline: 2px solid var(--color-linden);
+    outline-offset: 2px;
+  }
+}
+
+/* Secondary button on dark backgrounds */
+@utility btn-outline-light {
+  display: inline-block;
+  border: 2px solid var(--color-milk);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-milk);
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-milk) 10%, transparent);
   }
 }
 
