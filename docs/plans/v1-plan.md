@@ -379,3 +379,7 @@ important were checked in a browser on the live site. Decisions by the user, 202
 404; `/` still switches to `/uk`), R7.2 in 3 languages at 375 px and 1280 px, R7.5 (attribute
 absent when closed, present when open; toggle by click and keyboard), R7.6 (favicon on 404).
 Then redeploy the site, merge into `main`, push (ask before each).
+
+**R7 result (2026-11-21):** fixes in `f7a7638`; checked locally under `wrangler dev` and on the
+live site after redeploy: saved `uk` + `/menu-typo` shows the 404 page, `/` still restores `/uk`;
+prices `55 UAH` / `55 грн`, no price note; 404 page has the favicon.
