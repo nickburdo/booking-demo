@@ -163,6 +163,15 @@ export async function tableLabel(db: D1Database, tableId: number): Promise<strin
   return row?.label ?? `#${tableId}`;
 }
 
+/** When Telegram accepted the "new booking" notification, or null (ADR-018). */
+export async function notifiedAt(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT notified_at FROM reservations WHERE id = ?")
+    .bind(id)
+    .first<{ notified_at: string | null }>();
+  return row?.notified_at ?? null;
+}
+
 /** Records that Telegram accepted the owner notification (ADR-018). */
 export async function markNotified(
   db: D1Database,

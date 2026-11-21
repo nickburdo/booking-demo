@@ -273,3 +273,50 @@ and Phase 4 tested only wrong/empty tokens on the built site, so this was missed
 
 **Done when:** the live link opens the booking and cancel works.
 
+## Revision R4 (2026-11-21) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v3-booking-form` found 7 issues; all were
+confirmed in the code. The user chose to fix all of them, including the notification order.
+
+### R4.1 Form: API errors for `date` / `guests` are never shown (`BookingForm.vue`)
+- Show `fieldErrors.date` under the date input and `fieldErrors.guests` under the guests group
+  (same `field-error` style, `aria-invalid` / `aria-describedby` like the other fields).
+
+### R4.2 Form: clearing the date keeps the old times and the selected time
+- `loadTimes`: when the date is empty, clear `times` and `time`, set `timesState` to `idle`.
+- `checkLocally`: an empty date is a local error (`booking.fieldErrors.date`, key exists).
+
+### R4.3 Form: "Book another" reuses the spent Turnstile token
+- `bookAnother` sets `turnstileToken` to `null` and `turnstileFailed` to `false`; the remounted
+  widget issues a new token.
+
+### R4.4 API: the cancel message can arrive before the new-booking message (`notify.ts`)
+- Before sending a "cancelled" message, the background task re-reads the row and waits until
+  `notified_at` is set: check every 500 ms, up to 10 s (well inside the `waitUntil` limit).
+  If it is still empty after that (the first message failed), send the cancel message anyway.
+- If Telegram is not configured, nothing changes (both are skipped).
+- Tests (`apps/api/test/v3.test.ts`): cancel right after create sends "created" first, then
+  "cancelled"; cancel still sends after the wait when the "created" message failed.
+- ADR-018: describe the ordering rule and its limit (best effort, 10 s).
+
+### R4.5 Reservation page: a malformed hash leaves it on "Loading…" forever (`reservation.vue`)
+- Wrap the token decode in `try/catch`; on failure show "Booking not found".
+
+### R4.6 Form: "bot check could not load" comes back after the widget recovered
+- Set `turnstileFailed` to `false` when a non-null token arrives.
+
+### R4.7 Form: `DATE_OUT_OF_RANGE` shows a generic error / a useless "Try again"
+- New i18n key `booking.errors.DATE_OUT_OF_RANGE` (en/ru/uk): "This date is no longer
+  available. Pick another date."
+- On this code (from availability or create): recompute the bookable range, move the date to
+  the new first day if it fell out, show the message, reload times.
+
+### Verification
+- API: `pnpm --filter api test` and typecheck green.
+- Web, on the built site (`generate:local` + local API): R4.1 / R4.7 by forcing the API answer
+  (as in Phase 4), R4.2 / R4.3 / R4.5 / R4.6 by hand; R4.4 locally with real Telegram
+  (book → cancel at once → order in the chat).
+- Then redeploy API and web (ask first), short live check.
+
+**Done when:** all of the above pass; review findings closed.
+

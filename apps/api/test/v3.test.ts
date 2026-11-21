@@ -11,6 +11,7 @@ import {
   waitFor,
 } from "./helpers";
 import { outbound } from "./outbound";
+import { cancelOrder } from "../src/notify";
 
 beforeEach(async () => {
   pinClock();
@@ -138,6 +139,41 @@ describe("Telegram notifications", () => {
         "\n",
       ),
     );
+  });
+
+  it("sends the cancellation only after the new-booking message", async () => {
+    // The "new booking" request to Telegram is slow; the guest cancels at once (R4.4).
+    outbound.telegramDelayMs = (text) => (text.startsWith("🆕") ? 300 : 0);
+    const { body } = await create({ guests: 2, time: "12:00" });
+    const res = await call(`/reservations/${body.token}/cancel`, { method: "POST" });
+    expect(res.status).toBe(200);
+
+    await waitFor(async () => (await notificationColumns(body.reservation.id)).cancel_notified_at, 5000);
+    expect(outbound.telegramDone.map((text) => text.split("\n")[0])).toEqual([
+      "🆕 Нове бронювання",
+      "❌ Скасовано бронювання",
+    ]);
+  });
+
+  it("still sends the cancellation when the new-booking message failed", async () => {
+    const saved = { ...cancelOrder };
+    Object.assign(cancelOrder, { intervalMs: 20, maxWaitMs: 200 });
+    try {
+      outbound.telegram = "failed";
+      const { body } = await create({ guests: 2, time: "12:00" });
+      await waitFor(async () => outbound.telegramCalls.length > 0);
+      outbound.telegram = "ok";
+
+      await call(`/reservations/${body.token}/cancel`, { method: "POST" });
+      const cols = await waitFor(async () => {
+        const c = await notificationColumns(body.reservation.id);
+        return c.cancel_notified_at ? c : null;
+      });
+      expect(cols?.notified_at).toBeNull();
+      expect(cols?.cancel_notified_at).not.toBeNull();
+    } finally {
+      Object.assign(cancelOrder, saved);
+    }
   });
 
   it("sends nothing when booking fails", async () => {

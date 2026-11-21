@@ -163,6 +163,11 @@ has confirmed it in discussion.
 - **Consequences:** A Telegram outage never blocks a booking, but its message is lost; the v4
   admin can show reservations whose owner was not notified. Bot token and chat id are Worker
   secrets, never in the repo.
+- **Message order (v3 plan, R4.4):** the two messages of one booking are separate background
+  tasks. So that a quick cancel never reaches the owner before the "new booking" message, the
+  cancel task waits until `notified_at` is set (polling every 500 ms, up to 10 s). If the first
+  message failed, the cancel message is sent after the wait anyway. Best effort: the order is
+  guaranteed only within that 10 s window.
 
 ## ADR-019 — Cloudflare Turnstile on reservation creation
 

@@ -22,7 +22,14 @@ const time = ref<string | null>(null)
 let requestSeq = 0
 
 async function loadTimes() {
-  if (!date.value) return
+  if (!date.value) {
+    // Cleared or half-typed date: drop the times of the previous date (R4.2).
+    ++requestSeq
+    times.value = []
+    time.value = null
+    timesState.value = 'idle'
+    return
+  }
   const seq = ++requestSeq
   timesState.value = 'loading'
   try {
@@ -31,10 +38,27 @@ async function loadTimes() {
     times.value = result
     timesState.value = 'ready'
     if (time.value && !result.includes(time.value)) time.value = null
-  } catch {
+  } catch (error) {
     if (seq !== requestSeq) return
+    if (error instanceof ApiError && error.code === 'DATE_OUT_OF_RANGE') {
+      times.value = []
+      time.value = null
+      timesState.value = 'ready'
+      await onDateOutOfRange(false) // no reload here: it could loop
+      return
+    }
     timesState.value = 'error'
   }
+}
+
+// "Today" moved on since the page was opened (e.g. past midnight), so the chosen date is no
+// longer bookable (R4.7). Recompute the range, move the date into it if needed, explain.
+async function onDateOutOfRange(reloadTimes: boolean) {
+  range.value = bookableRange()
+  if (date.value < range.value.min || date.value > range.value.max) date.value = range.value.min
+  else if (reloadTimes) loadTimes()
+  await nextTick() // let the date watcher clear the old error and reload the times first
+  fieldErrors.value = { ...fieldErrors.value, date: t('booking.errors.DATE_OUT_OF_RANGE') }
 }
 
 watch([date, guests], loadTimes)
@@ -71,6 +95,7 @@ function phoneLooksValid(value: string): boolean {
 
 function checkLocally(): boolean {
   const errors: Record<string, string> = {}
+  if (!date.value) errors.date = t('booking.fieldErrors.date')
   if (!time.value) errors.time = t('booking.fieldErrors.time')
   if (!name.value.trim()) errors.name = t('booking.fieldErrors.name')
   if (!phoneLooksValid(phone.value)) errors.phone = t('booking.fieldErrors.phone')
@@ -87,11 +112,17 @@ function clearError(field: string) {
     fieldErrors.value = rest
   }
 }
+watch(date, () => clearError('date'))
+watch(guests, () => clearError('guests'))
 watch(time, () => clearError('time'))
 watch(name, () => clearError('name'))
 watch(phone, () => clearError('phone'))
 watch(comment, () => clearError('comment'))
-watch(turnstileToken, (token) => token && clearError('turnstile'))
+watch(turnstileToken, (token) => {
+  if (!token) return
+  clearError('turnstile')
+  turnstileFailed.value = false // the widget recovered (R4.6)
+})
 
 const KNOWN_FIELDS = ['date', 'time', 'guests', 'name', 'phone', 'comment']
 
@@ -105,6 +136,10 @@ function showApiError(error: unknown, attemptedTime: string) {
     }
     fieldErrors.value = errors
     if (Object.keys(errors).length === 0) formError.value = t('booking.errors.generic')
+    return
+  }
+  if (code === 'DATE_OUT_OF_RANGE') {
+    void onDateOutOfRange(true)
     return
   }
   const known = ['SLOT_TAKEN', 'TIME_NOT_BOOKABLE', 'VERIFICATION_FAILED', 'VERIFICATION_UNAVAILABLE', 'RATE_LIMITED', 'NETWORK']
@@ -164,6 +199,9 @@ async function copyLink() {
 
 function bookAnother() {
   result.value = null
+  // The token of the finished booking is spent; the remounted widget issues a new one (R4.3).
+  turnstileToken.value = null
+  turnstileFailed.value = false
   time.value = null
   comment.value = ''
   fieldErrors.value = {}
@@ -219,7 +257,11 @@ const submitLabel = computed(() =>
           :max="range?.max"
           required
           class="field-input max-w-64"
+          :class="{ 'field-input-error': fieldErrors.date }"
+          :aria-invalid="!!fieldErrors.date"
+          :aria-describedby="fieldErrors.date ? 'booking-date-error' : undefined"
         >
+        <p v-if="fieldErrors.date" id="booking-date-error" class="field-error">{{ fieldErrors.date }}</p>
       </div>
       <fieldset class="mt-4">
         <legend class="field-label">{{ t('booking.guests') }}</legend>
@@ -229,13 +271,14 @@ const submitLabel = computed(() =>
             <span>{{ n }}</span>
           </label>
         </div>
+        <p v-if="fieldErrors.guests" class="field-error">{{ fieldErrors.guests }}</p>
       </fieldset>
 
       <h3 class="step-title mt-7"><span>2</span>{{ t('booking.step2') }}</h3>
       <div class="mt-4" aria-live="polite">
         <div v-if="timesState === 'loading' || timesState === 'idle'" class="grid grid-cols-4 gap-2 sm:grid-cols-6">
           <div v-for="i in 8" :key="i" class="h-11 rounded-[10px] bg-milk/10" />
-          <p class="col-span-full mt-1 text-[15px] text-milk/70">{{ t('booking.loadingTimes') }}</p>
+          <p v-if="date" class="col-span-full mt-1 text-[15px] text-milk/70">{{ t('booking.loadingTimes') }}</p>
         </div>
         <div v-else-if="timesState === 'error'" class="rounded-[10px] border-2 border-dashed border-milk/25 p-4">
           {{ t('booking.timesError') }}

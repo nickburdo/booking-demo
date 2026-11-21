@@ -44,7 +44,11 @@ async function load() {
 const route = useRoute()
 onNuxtReady(() => {
   hydrated.value = true
-  token = decodeURIComponent(route.hash.slice(1))
+  try {
+    token = decodeURIComponent(route.hash.slice(1))
+  } catch {
+    token = '' // malformed hash, e.g. a truncated link (R4.5)
+  }
   if (token) load()
   else state.value = 'notFound'
 })

@@ -13,6 +13,10 @@ export const outbound = {
   /** Request bodies sent to each service, in order. */
   turnstileCalls: [] as Array<Record<string, unknown>>,
   telegramCalls: [] as Array<{ url: string; body: Record<string, unknown> }>,
+  /** Delay before Telegram answers, per message text (to reorder messages in tests). */
+  telegramDelayMs: (_text: string): number => 0,
+  /** Texts of Telegram messages in the order their requests finished. */
+  telegramDone: [] as string[],
 };
 
 const realFetch = globalThis.fetch;
@@ -29,6 +33,8 @@ beforeEach(() => {
   outbound.telegram = "ok";
   outbound.turnstileCalls = [];
   outbound.telegramCalls = [];
+  outbound.telegramDelayMs = () => 0;
+  outbound.telegramDone = [];
 
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
@@ -50,6 +56,9 @@ beforeEach(() => {
 
     if (url.startsWith("https://api.telegram.org/")) {
       outbound.telegramCalls.push({ url, body });
+      const delay = outbound.telegramDelayMs(String(body.text ?? ""));
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+      outbound.telegramDone.push(String(body.text ?? ""));
       switch (outbound.telegram) {
         case "ok":
           return json({ ok: true, result: { message_id: 1 } });
