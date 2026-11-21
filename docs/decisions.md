@@ -79,7 +79,7 @@ has confirmed it in discussion.
 
 ## ADR-010 — Booking CTA present from v1
 
-- **Status:** Accepted (2026-11-21)
+- **Status:** Accepted (2026-11-21); superseded by ADR-017 in v3 (the CTA now leads to the booking form)
 - **Decision:** v1 has a "Book a table" button leading to a "Booking coming soon" section,
   so the page structure is final from the start.
 
@@ -140,3 +140,39 @@ has confirmed it in discussion.
   `workerd` against a local D1 with the real migrations. Tests are written after the code
   (no TDD). Manual verification stays. `apps/web` remains without tests.
 - **Consequences:** Time rules take "now" as a parameter so tests are deterministic.
+
+## ADR-017 — Booking form in the landing page, reservation page by private link
+
+- **Status:** Accepted (2026-11-21, v3 plan)
+- **Decision:** The booking form replaces the "coming soon" text in `#booking`. Flow: date
+  (native date input, today … +30) and party size → free start times from `GET /availability`
+  as buttons → name, phone, comment → submit. After booking the guest gets a confirmation and a
+  personal link `/reservation#<token>` (also `/ru`, `/uk`) to view and cancel the reservation.
+- **Consequences:** The page stays a one-pager; taken times are never offered. The token lives
+  in the URL hash, so the static host never receives it. Supersedes ADR-010.
+
+## ADR-018 — Telegram notifications to the owner
+
+- **Status:** Accepted (2026-11-21, v3 plan)
+- **Decision:** A Telegram bot writes to the owner's private chat on every new reservation and
+  guest cancellation: full details (date, time, guests, table, name, phone, comment) in
+  Ukrainian. Messages are sent in the background (`waitUntil`) without retries; success is
+  recorded in `notified_at` / `cancel_notified_at`.
+- **Alternatives rejected:** synchronous sending (slow Telegram delays the guest); Cloudflare
+  Queues with retries (more moving parts than a demo needs).
+- **Consequences:** A Telegram outage never blocks a booking, but its message is lost; the v4
+  admin can show reservations whose owner was not notified. Bot token and chat id are Worker
+  secrets, never in the repo.
+
+## ADR-019 — Cloudflare Turnstile on reservation creation
+
+- **Status:** Accepted (2026-11-21, v3 plan)
+- **Context:** Each fake booking now also pings the owner in Telegram; the rate limit alone only
+  slows a flood.
+- **Decision:** `POST /reservations` requires a Turnstile token, verified with `siteverify`
+  after body validation. If Turnstile cannot be reached the request is refused
+  (`503 VERIFICATION_UNAVAILABLE`, fail closed).
+- **Consequences:** The live API no longer accepts bookings from scripts: Turnstile's
+  production secret rejects test tokens. `race.mjs` and `curl` create examples run against a
+  local API with the test secret. The chats (v5–v6) will need their own answer to bot
+  protection.

@@ -1,7 +1,8 @@
 # Booking API
 
-Status: **v2 — implemented** (2026-11-21). Examples below are real responses from the live
-API (the example reservation was cancelled afterwards).
+Status: **v2 — implemented** (2026-11-21); **v3 changes planned** (`docs/plans/v3-plan.md`):
+Turnstile on `POST /reservations`, Telegram notifications. Examples below are real responses
+from the live v2 API (the example reservation was cancelled afterwards).
 
 The single backend for every booking interface: the form (v3), the admin (v4) and both chats
 (v5–v6) go through these endpoints and these rules only.
@@ -46,6 +47,14 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
   `https://booking-demo-web.nick-burdo.workers.dev` and `http://localhost:3000`.
 - **Rate limit:** `POST /reservations` allows 10 requests per 60 seconds per client IP
   (counted per Cloudflare location, so approximate). Over the limit → `429 RATE_LIMITED`.
+- **Bot protection (v3):** `POST /reservations` needs a Cloudflare Turnstile token from the
+  site's widget (`turnstileToken`). The live API uses a production secret, which rejects
+  Turnstile's test tokens, so **scripts and `curl` cannot create reservations on the live API**;
+  they work against a local API that uses the Turnstile test secret (ADR-019). Reading
+  availability, viewing and cancelling need no token.
+- **Notifications (v3):** a new reservation and a guest cancellation each send a Telegram
+  message to the owner in the background. Delivery is best effort: a Telegram failure never
+  changes the API response (ADR-018).
 
 ### Error codes
 
@@ -54,12 +63,14 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 400 | `VALIDATION` | Missing or malformed field / query parameter |
 | 400 | `DATE_OUT_OF_RANGE` | Availability asked for a past date or beyond the 30-day horizon |
 | 400 | `TIME_NOT_BOOKABLE` | Start time off the 30-min grid, outside hours, less than 1 h from now, or beyond the horizon |
+| 400 | `VERIFICATION_FAILED` | Turnstile token missing, invalid, expired or already used (v3) |
 | 404 | `NOT_FOUND` | Unknown route, or no reservation for this token |
 | 409 | `SLOT_TAKEN` | No table for this party size is free for the whole 90 minutes |
 | 409 | `NOT_CANCELLABLE` | Reservation already cancelled or already started |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
 | 429 | `RATE_LIMITED` | Too many create requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
+| 503 | `VERIFICATION_UNAVAILABLE` | Turnstile could not be reached; the booking is refused, try again (v3) |
 
 ## Reservation object
 
@@ -132,6 +143,14 @@ Body:
 | `name` | string | 1–80 characters after trimming |
 | `phone` | string | International with `+` (spaces, dashes, brackets allowed), or Ukrainian local `0XXXXXXXXX`; stored as E.164 (`+380XXXXXXXXX`) |
 | `comment` | string, optional | up to 500 characters |
+| `turnstileToken` | string | (v3) Turnstile token from the site widget, up to 2048 characters; single use, valid 5 minutes |
+
+Checks run in this order: rate limit → body validation → Turnstile → booking rules. A
+Turnstile token is spent only on an otherwise valid request; after any response the client
+gets a fresh token before trying again.
+
+The example below is from v2 (no token). From v3 on, run it against a local API with
+`"turnstileToken":"XXXX.DUMMY.TOKEN.XXXX"` (Turnstile's test token).
 
 ```bash
 curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations \
@@ -153,7 +172,10 @@ curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations \
 The `token` is shown **only once**. It is the guest's private key to view and cancel the
 reservation; only its hash is stored.
 
-Errors: `400 VALIDATION`, `400 TIME_NOT_BOOKABLE`, `409 SLOT_TAKEN`, `429 RATE_LIMITED`.
+Errors: `400 VALIDATION`, `400 TIME_NOT_BOOKABLE`, `400 VERIFICATION_FAILED`,
+`409 SLOT_TAKEN`, `429 RATE_LIMITED`, `503 VERIFICATION_UNAVAILABLE`.
+
+Side effect (v3): a Telegram message to the owner, sent after the response (best effort).
 
 ### `GET /reservations/:token`
 
@@ -179,6 +201,8 @@ curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations/<token
 
 Errors: `404 NOT_FOUND`, `409 NOT_CANCELLABLE`.
 
+Side effect (v3): a Telegram message to the owner about the cancellation (best effort).
+
 ## How double booking is prevented
 
 Each reservation occupies three 30-minute cells `(table, slot)` in `reservation_slots`, whose
@@ -188,7 +212,8 @@ rejects the insert and the whole batch rolls back; the API then tries the next s
 and answers `409 SLOT_TAKEN` when none is left. See ADR-011.
 
 **See it:** `apps/api/scripts/race.mjs` fires 8 concurrent bookings for 4 guests at one time
-and cancels them afterwards. A run against the live API:
+and cancels them afterwards. From v3 on it runs against a local API only (Turnstile, see
+Conventions). A run against the live API in v2:
 
 ```
 $ node scripts/race.mjs --base https://booking-demo-api.nick-burdo.workers.dev

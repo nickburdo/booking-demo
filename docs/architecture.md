@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1 and v2 implemented** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1 and v2 implemented, v3 planned** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -16,6 +16,7 @@ Browser
   └── api  (Express on Cloudflare Workers)          ── v2
         ├── D1 (SQLite) — tables, slots, reservations  ── v2
         ├── Telegram Bot API — owner notifications     ── v3
+        ├── Cloudflare Turnstile — bot check on create  ── v3
         ├── LLM provider — AI chat tool calls          ── v6
         └── Payment provider (test mode)               ── v7
 ```
@@ -129,3 +130,24 @@ Learned in v2:
 - pnpm's `minimumReleaseAge` policy rejects packages published less than a day ago; pin the
   previous release (here `wrangler@4.165.0`, `@cloudflare/vitest-plugin@1.8.5`) instead of
   adding exclusions.
+
+## Booking form, notifications, bot check (v3) — planned
+
+Plan: `docs/plans/v3-plan.md`. Decisions: ADR-017 … ADR-019.
+
+Web (`apps/web`):
+- `BookingSection.vue` hosts `BookingForm.vue`: date + guests → free times → contacts →
+  Turnstile → `POST /reservations` → confirmation with the personal link.
+- `pages/reservation.vue`: reads the token from the URL hash in the browser, shows the
+  reservation, offers cancellation; `noindex`.
+- `TurnstileWidget.vue` (client-only, explicit render) and `composables/useBookingApi.ts`.
+- Config baked in at `nuxt generate`: `NUXT_PUBLIC_API_BASE`, `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
+  (local values in git-ignored `apps/web/.env`).
+
+API (`apps/api`):
+- `src/turnstile.ts`: `siteverify` check after body validation; fail closed.
+- `src/telegram.ts`: Ukrainian message builder (HTML-escaped) and `sendMessage` call; run via
+  `waitUntil` from `cloudflare:workers` after create and cancel; success stamps
+  `notified_at` / `cancel_notified_at` (migration `0003`).
+- Secrets (`wrangler secret put`): `TURNSTILE_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
+  local values in git-ignored `apps/api/.dev.vars` (Turnstile test secret).
