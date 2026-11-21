@@ -11,7 +11,7 @@ the app's data file mirrors it.
   - EN: Slow coffee under the lindens
   - UK: Повільна кава під липами
   - RU: Неспешный кофе под липами
-- **Size:** small, ~24 seats (relevant from v2: tables/capacity will be defined in the v2 plan)
+- **Size:** small, 24 seats at 8 tables (see "Tables" below; defined in the v2 plan)
 
 ## Address and location
 
@@ -28,6 +28,32 @@ the app's data file mirrors it.
 |---|---|
 | Mon–Fri | 08:00–21:00 |
 | Sat–Sun | 09:00–22:00 |
+
+## Tables
+
+Added in v2. Guests never choose a table; the booking API assigns one.
+
+| Table | Seats |
+|---|---|
+| T1, T2, T3, T4 | 2 |
+| T5, T6, T7, T8 | 4 |
+
+## Booking rules
+
+Added in v2. All times are Kyiv local time (Europe/Kyiv).
+
+- **Duration:** every reservation lasts 90 minutes.
+- **Start times:** on a 30-minute grid, from opening time until 90 minutes before closing:
+  Mon–Fri 08:00–19:30, Sat–Sun 09:00–20:30.
+- **Lead time:** a reservation must start at least 1 hour from now.
+- **Horizon:** at most 30 days ahead.
+- **Party size:** 1–4 guests. Larger parties cannot book online.
+- **Table assignment:** the smallest free table that fits the party; a party of 1–2 gets a
+  4-seat table if all 2-seat tables are taken.
+- **Guest details:** name and phone (required), comment (optional).
+- **Status:** a new reservation is `pending` and holds its table. The guest can cancel it
+  with the private link (token) received on booking, until the start time. Owner
+  confirmation arrives in v4.
 
 ## Menu (prices in UAH)
 

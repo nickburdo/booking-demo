@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1 implemented** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1 implemented, v2 planned** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -32,6 +32,7 @@ booking-demo/
 ├── docs/
 │   ├── overview.md
 │   ├── architecture.md
+│   ├── api.md      booking API contract (v2)
 │   ├── decisions.md
 │   ├── cafe.md     fictional coffee shop content (source of truth)
 │   ├── design.md   visual design (v1)
@@ -77,12 +78,39 @@ Learned in v1:
   `drop-trailing-slash` (R2). Checked locally with `wrangler dev`, which emulates the host.
 - The server never sees `#hash`; links that depend on it must change only after hydration.
 
-## API (v2+)
+## API (v2) — planned
 
-To be designed in `docs/plans/v2-plan.md`. Known constraints already:
+Plan: `docs/plans/v2-plan.md`. Contract: `docs/api.md`. Decisions: ADR-011 … ADR-016.
 
-- Express runs on Workers via the `nodejs_compat` flag and `httpServerHandler`
-  (official Cloudflare tutorial "Deploy an Express app").
-- D1 has **no interactive transactions** (`BEGIN … COMMIT`); atomicity is available only
-  through `batch()` and single statements. Double-booking protection must be designed
-  around this (unique constraints and/or conditional single-statement inserts).
+- Express on Workers: `nodejs_compat` flag, app exported via `httpServerHandler` from
+  `cloudflare:node`; bindings read with `import { env } from "cloudflare:workers"`.
+- Worker `booking-demo-api` (`https://booking-demo-api.nick-burdo.workers.dev`),
+  D1 database `booking-demo-db` (binding `DB`), rate limiter binding `CREATE_LIMITER`.
+- D1 has **no interactive transactions** (`BEGIN … COMMIT`); atomicity comes from single
+  statements and `batch()` (one SQL transaction, rolled back if any statement fails).
+
+Planned layout of `apps/api`:
+
+```
+apps/api/
+├── migrations/        0001_init.sql (schema), 0002_seed_tables.sql
+├── src/
+│   ├── index.ts       Express app, routes, CORS, error handler, httpServerHandler export
+│   ├── config.ts      opening hours and booking rules (mirrors docs/cafe.md)
+│   ├── time.ts        Kyiv time helpers and time rules (take "now" as a parameter)
+│   ├── validation.ts  zod schemas, phone normalisation
+│   ├── token.ts       token generation and hashing
+│   ├── repo.ts        raw SQL (prepare/bind/batch)
+│   └── booking.ts     availability, create, cancel
+├── test/              Vitest + @cloudflare/vitest-plugin (unit, HTTP, concurrency)
+├── scripts/race.mjs   concurrent-booking demo against a running API
+└── wrangler.jsonc
+```
+
+Data model: `tables` (8 rows), `reservations` (status `pending`/`cancelled`, token hash),
+`reservation_slots` (`PRIMARY KEY (table_id, slot)` — the double-booking guard). Times are
+stored as Kyiv-local strings (`YYYY-MM-DD`, `HH:MM`, slot `YYYY-MM-DDTHH:MM`).
+
+Booking: validate → check time rules → compute the 3 slot keys → read free fitting tables
+(smallest first) → `batch(insert reservation + 3 slot rows)`; on a primary-key conflict try
+the next table; none left → `409 SLOT_TAKEN`. Cancel: `batch(update status, delete slots)`.

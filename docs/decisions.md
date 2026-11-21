@@ -82,3 +82,61 @@ has confirmed it in discussion.
 - **Status:** Accepted (2026-11-21)
 - **Decision:** v1 has a "Book a table" button leading to a "Booking coming soon" section,
   so the page structure is final from the start.
+
+## ADR-011 — Time slots + unique key against double booking
+
+- **Status:** Accepted (2026-11-21, v2 plan)
+- **Context:** D1 has no interactive transactions, so "read, check, then write" in separate
+  statements races. Atomicity is available through single statements and `batch()`, which D1
+  documents as a SQL transaction that rolls back entirely when one statement fails.
+- **Decision:** Reservations start on a 30-minute grid and last 90 minutes (3 slots). Each
+  reservation writes its cells to `reservation_slots` with `PRIMARY KEY (table_id, slot)`; the
+  reservation row and its cells are inserted in one `batch()`.
+- **Alternatives rejected:** conditional `INSERT … WHERE NOT EXISTS (overlap)` — allows free
+  start times, but correctness rests on the query, not on a constraint; a Durable Object per
+  day as a lock — a second storage and concept for a problem the unique key already solves.
+- **Consequences:** The database itself makes double booking impossible. Free start times
+  and variable durations would need a different design.
+
+## ADR-012 — Automatic table assignment, parties of 1–4
+
+- **Status:** Accepted (2026-11-21, v2 plan)
+- **Decision:** 8 tables (T1–T4 × 2 seats, T5–T8 × 4 seats). The guest gives date, time and
+  party size; the API picks the smallest free table that fits, then the lowest id. A party of
+  1–2 may get a 4-seat table. Larger parties cannot book online; tables are never combined.
+- **Consequences:** Interfaces (form, chats) never deal with tables. Table ids are not exposed
+  to guests.
+
+## ADR-013 — Guest access by a secret token, stored hashed
+
+- **Status:** Accepted (2026-11-21, v2 plan)
+- **Decision:** On creation the API returns a random token (32 bytes, base64url) once; the guest
+  views and cancels the reservation with it. Only its SHA-256 hash is stored.
+- **Consequences:** No guest accounts. A leaked database does not expose working links. A lost
+  token cannot be recovered (the owner can still act in v4).
+
+## ADR-014 — Raw SQL with D1 migrations, no ORM
+
+- **Status:** Accepted (2026-11-21, v2 plan)
+- **Decision:** Schema as SQL files applied by `wrangler d1 migrations`; queries with D1
+  `prepare/bind/batch`.
+- **Consequences:** The double-booking logic is visible in plain SQL (a learning goal). Row
+  types are written by hand.
+
+## ADR-015 — Rate limiting and CORS for the public API
+
+- **Status:** Accepted (2026-11-21, v2 plan)
+- **Decision:** Workers Rate Limiting binding on `POST /reservations` (10 per 60 s per client IP;
+  counters are per Cloudflare location). CORS allows only the live site and `localhost:3000`.
+- **Consequences:** Floods of fake bookings are slowed down, not prevented absolutely; CORS
+  only restricts browsers. Stronger measures (captcha, phone verification) are out of scope.
+
+## ADR-016 — Automated tests for the API
+
+- **Status:** Accepted (2026-11-21, v2 plan; user request)
+- **Context:** The project default is no automated tests. v2 is the first version with real
+  logic whose failure is silent (a double booking, a wrong time rule).
+- **Decision:** `apps/api` has tests with Vitest and `@cloudflare/vitest-plugin`, running inside
+  `workerd` against a local D1 with the real migrations. Tests are written after the code
+  (no TDD). Manual verification stays. `apps/web` remains without tests.
+- **Consequences:** Time rules take "now" as a parameter so tests are deterministic.
