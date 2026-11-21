@@ -105,6 +105,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 - **Done when:** on the branch.
 
 ### 1.2 Telegram bot (user)
+- Steps: [`docs/setup-integrations.md`](../setup-integrations.md) (added in R2).
 - User creates a bot in @BotFather and sends it `/start` from their account; I give exact steps.
   User reads their `chat_id` (I provide a `curl …/getUpdates` command to run locally).
 - Token and chat id are **not** pasted into the chat; the user stores them with
@@ -113,6 +114,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 - **Done when:** `wrangler secret list` shows both names.
 
 ### 1.3 Turnstile widget (user)
+- Steps: [`docs/setup-integrations.md`](../setup-integrations.md) (added in R2).
 - User creates a widget in the Cloudflare dashboard (Turnstile → Add widget), hostnames
   `booking-demo-web.nick-burdo.workers.dev` and `localhost`, mode "Managed". Site key may be
   shared in the chat (it is public); secret goes via `wrangler secret put TURNSTILE_SECRET`.
@@ -218,7 +220,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 ## Phase 6 — Review and wrap-up
 
 ### 6.1 Code review of `main...feature/v3-booking-form`; findings discussed; fixes via plan revision.
-### 6.2 README (how to run with `.env` / `.dev.vars`, Telegram/Turnstile setup), `docs/architecture.md`
+### 6.2 README (how to run with `.env.local` / `.dev.vars`, link to `docs/setup-integrations.md`), `docs/architecture.md`
   (v3 implemented, learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first).
 
@@ -242,3 +244,13 @@ server for it.
 
 **Done when:** `pnpm generate` output contains the live `apiBase` and no test site key;
 `generate:local` output contains the local values.
+
+## Revision R2 (2026-11-21) — setup steps as a separate doc (approved)
+
+**Trigger:** the Telegram/Turnstile setup steps were only given in the chat and were hard to find.
+
+**Decision (user):** the steps live in `docs/setup-integrations.md` (bot, chat id, Turnstile widget,
+`wrangler secret put`, optional local `.dev.vars`). Phase 1.2/1.3 and 6.2 link to it; the README
+links to it instead of repeating the steps.
+
+**Done when:** the file exists and is linked from this plan (now) and the README (6.2).
