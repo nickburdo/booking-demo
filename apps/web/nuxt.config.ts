@@ -10,6 +10,8 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
   i18n: {
+    // Live site address: makes hreflang and canonical links absolute (plan revision R4)
+    baseUrl: 'https://booking-demo-web.nick-burdo.workers.dev',
     defaultLocale: 'en',
     strategy: 'prefix_except_default',
     locales: [
