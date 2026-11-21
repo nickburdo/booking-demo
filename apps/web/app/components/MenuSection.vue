@@ -18,11 +18,10 @@ const localized = useLocalized()
             class="flex justify-between gap-4 border-t border-line py-2.5 first:border-t-0"
           >
             <span>{{ localized(item.name) }}</span>
-            <span class="font-semibold tabular-nums">{{ item.price }}</span>
+            <span class="whitespace-nowrap font-semibold tabular-nums">{{ item.price }} {{ t('menu.currency') }}</span>
           </li>
         </ul>
       </div>
     </div>
-    <p class="mt-7 text-[15px] text-steam">{{ t('menu.note') }}</p>
   </section>
 </template>

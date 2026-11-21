@@ -19,8 +19,7 @@
   },
   "menu": {
     "title": "Menu",
-    "currency": "UAH",
-    "note": "Prices in hryvnias (UAH)."
+    "currency": "UAH"
   },
   "hours": {
     "title": "Opening hours"

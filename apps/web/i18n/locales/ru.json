@@ -19,8 +19,7 @@
   },
   "menu": {
     "title": "Меню",
-    "currency": "грн",
-    "note": "Цены в гривнах."
+    "currency": "грн"
   },
   "hours": {
     "title": "Часы работы"

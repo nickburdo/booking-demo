@@ -7,7 +7,8 @@ const localized = useLocalized()
 const center: [number, number] = [cafe.coordinates.lat, cafe.coordinates.lng]
 
 // Keep the page scrollable over the map (plan step 5.6): no wheel zoom, and on touch
-// screens no one-finger panning, so a swipe over the map still scrolls the page.
+// screens no drag panning at all (Leaflet has no two-finger pan), so a swipe over the map
+// still scrolls the page; pinch-zoom keeps working. Checked once at load, not on input change.
 // The map renders only in the browser (<ClientOnly>), so the server value is never used.
 const mapOptions = {
   scrollWheelZoom: false,
