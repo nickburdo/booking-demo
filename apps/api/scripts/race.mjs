@@ -18,8 +18,16 @@ const args = Object.fromEntries(
 );
 
 const base = (args.base ?? "http://localhost:8787").replace(/\/$/, "");
-const n = Number(args.n ?? 8);
+// "--n" given without a value is an error, not the default.
+const n = "n" in args ? Number(args.n) : 8;
 const guests = 4;
+const fourSeatTables = 4;
+
+// The create endpoint allows 10 requests per minute per IP, so more would only measure the limiter.
+if (!Number.isInteger(n) || n < 1 || n > 10) {
+  console.error(`--n must be an integer from 1 to 10 (got ${args.n}).`);
+  process.exit(2);
+}
 
 function kyivDate(daysAhead) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
@@ -72,9 +80,30 @@ for (const r of results) {
 
 const created = results.filter((r) => r.status === 201);
 const taken = results.filter((r) => r.body.error?.code === "SLOT_TAKEN");
-const other = results.length - created.length - taken.length;
-console.log(`\n${created.length} booked, ${taken.length} SLOT_TAKEN, ${other} other — in ${ms} ms`);
-console.log(created.length <= 4 ? "OK: no more bookings than 4-seat tables." : "FAIL: double booking!");
+const limited = results.filter((r) => r.body.error?.code === "RATE_LIMITED");
+const other = results.length - created.length - taken.length - limited.length;
+console.log(
+  `\n${created.length} booked, ${taken.length} SLOT_TAKEN, ${limited.length} RATE_LIMITED, ${other} other — in ${ms} ms`,
+);
+
+// The race really happened only if every request reached the booking logic and at least
+// one won; double booking means more winners than 4-seat tables.
+let ok = true;
+if (created.length > fourSeatTables) {
+  console.log("FAIL: double booking!");
+  ok = false;
+} else if (limited.length > 0) {
+  console.log("INCONCLUSIVE: rate limit hit — wait a minute and run again.");
+  ok = false;
+} else if (other > 0 || created.length === 0) {
+  console.log("INCONCLUSIVE: unexpected responses or no booking succeeded.");
+  ok = false;
+} else {
+  console.log(`OK: ${created.length} booking(s), never more than ${fourSeatTables} 4-seat tables.`);
+  if (created.length < Math.min(n, fourSeatTables)) {
+    console.log(`Note: only ${created.length} 4-seat table(s) were free at ${time}; pick an empty time to see all 4.`);
+  }
+}
 
 // Clean up: cancel what was created.
 for (const r of created) {
@@ -82,4 +111,6 @@ for (const r of created) {
 }
 console.log(`Cancelled ${created.length} reservation(s).`);
 
-process.exit(created.length <= 4 && other === 0 ? 0 : 1);
+// exitCode instead of process.exit(): exiting while fetch sockets are still closing can
+// abort Node on Windows (libuv "UV_HANDLE_CLOSING" assertion).
+process.exitCode = ok ? 0 : 1;
