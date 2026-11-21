@@ -1,7 +1,7 @@
 # Booking API
 
-Status: **v2 — planned** (contract approved with `docs/plans/v2-plan.md`; examples are
-finalised with real responses at the end of v2).
+Status: **v2 — implemented** (2026-11-21). Examples below are real responses from the live
+API (the example reservation was cancelled afterwards).
 
 The single backend for every booking interface: the form (v3), the admin (v4) and both chats
 (v5–v6) go through these endpoints and these rules only.
@@ -22,7 +22,26 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
   { "error": { "code": "SLOT_TAKEN", "message": "No table is free for 4 guests at 19:00." } }
   ```
 
-  `VALIDATION` errors add `fields`: `{ "fieldName": "message" }`.
+  `VALIDATION` errors add `fields`: `{ "fieldName": "message" }` (first message per field):
+
+  ```json
+  {
+    "error": {
+      "code": "VALIDATION",
+      "message": "Invalid request",
+      "fields": {
+        "time": "Invalid input: expected string, received undefined",
+        "guests": "Too big: expected number to be <=4",
+        "name": "Invalid input: expected string, received undefined",
+        "phone": "Expected an international number with + or a Ukrainian number starting with 0"
+      }
+    }
+  }
+  ```
+
+  A body that is not valid JSON → `400 VALIDATION` "Body is not valid JSON." (no `fields`).
+  A body over 10 KB → `413 PAYLOAD_TOO_LARGE`. Any other unreadable body (e.g. unsupported
+  charset) → `400 VALIDATION` "Request body could not be read."
 - **CORS:** browser requests are allowed only from
   `https://booking-demo-web.nick-burdo.workers.dev` and `http://localhost:3000`.
 - **Rate limit:** `POST /reservations` allows 10 requests per 60 seconds per client IP
@@ -38,6 +57,7 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 404 | `NOT_FOUND` | Unknown route, or no reservation for this token |
 | 409 | `SLOT_TAKEN` | No table for this party size is free for the whole 90 minutes |
 | 409 | `NOT_CANCELLABLE` | Reservation already cancelled or already started |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
 | 429 | `RATE_LIMITED` | Too many create requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
 
@@ -91,8 +111,12 @@ curl "https://booking-demo-api.nick-burdo.workers.dev/availability?date=2026-12-
 `200` →
 
 ```json
-{ "date": "2026-12-05", "guests": 4, "times": ["09:00", "09:30", "10:00", "…", "20:30"] }
+{"date":"2026-12-05","guests":4,"times":["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"]}
 ```
+
+A time disappears once no fitting table is free for the whole 90 minutes starting then
+(e.g. with all four 4-seat tables booked at 19:00, a party of 4 loses 18:00, 18:30, 19:00
+and 19:30; a party of 2 still sees 19:00 on the 2-seat tables).
 
 Errors: `400 VALIDATION`, `400 DATE_OUT_OF_RANGE`.
 
@@ -119,10 +143,10 @@ curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations \
 
 ```json
 {
-  "reservation": { "id": "…", "date": "2026-12-05", "time": "19:00", "endTime": "20:30",
-                   "guests": 4, "name": "Olena", "phone": "+380671234567",
-                   "comment": null, "status": "pending" },
-  "token": "q3J5mY…43 characters…"
+  "reservation": { "id": "44c9f1de-7573-4509-a6c9-59f0650c7f35", "date": "2026-12-05",
+                   "time": "19:00", "endTime": "20:30", "guests": 4, "name": "Olena",
+                   "phone": "+380671234567", "comment": null, "status": "pending" },
+  "token": "fL2o1pFoEFEQ9G-BpRRSEupi-5qyvrjLrK-A4uaXutM"
 }
 ```
 
@@ -147,7 +171,12 @@ Allowed while the reservation is `pending` and has not started. Frees the table.
 curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations/<token>/cancel
 ```
 
-`200` → `{ "reservation": { …, "status": "cancelled" } }`.
+`200` → `{ "reservation": { …, "status": "cancelled" } }`. Cancelling again:
+
+```json
+{"error":{"code":"NOT_CANCELLABLE","message":"This reservation is already cancelled or has already started."}}
+```
+
 Errors: `404 NOT_FOUND`, `409 NOT_CANCELLABLE`.
 
 ## How double booking is prevented
@@ -157,3 +186,26 @@ primary key is `(table_id, slot)`. The reservation row and its cells are written
 `batch()`, which is a single SQL transaction. If any cell is already taken, the database
 rejects the insert and the whole batch rolls back; the API then tries the next suitable table
 and answers `409 SLOT_TAKEN` when none is left. See ADR-011.
+
+**See it:** `apps/api/scripts/race.mjs` fires 8 concurrent bookings for 4 guests at one time
+and cancels them afterwards. A run against the live API:
+
+```
+$ node scripts/race.mjs --base https://booking-demo-api.nick-burdo.workers.dev
+Target: 2026-11-28 20:30, 4 guests, 8 concurrent requests
+
+  request  1: 201  reservation d48196ff-…
+  request  2: 201  reservation defa2782-…
+  request  3: 409  SLOT_TAKEN
+  request  4: 409  SLOT_TAKEN
+  request  5: 409  SLOT_TAKEN
+  request  6: 409  SLOT_TAKEN
+  request  7: 201  reservation af5213d8-…
+  request  8: 201  reservation e77fd5f9-…
+
+4 booked, 4 SLOT_TAKEN, 0 RATE_LIMITED, 0 other — in 398 ms
+OK: 4 booking(s), never more than 4 4-seat tables.
+```
+
+The four successful bookings landed on tables T5–T8, one each; no `(table, slot)` pair was
+stored twice.

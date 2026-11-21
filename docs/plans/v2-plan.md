@@ -1,6 +1,8 @@
 # v2 plan — Booking API and database
 
-- **Status:** Approved (2026-11-21) — in progress
+- **Status:** Done (2026-11-21) — API live at https://booking-demo-api.nick-burdo.workers.dev;
+  64 automated tests green; revision R1 (code review fixes) implemented and redeployed.
+  Notes at the end of this file.
 - **Scope:** stage v2 of the roadmap (`docs/overview.md`): `apps/api` — Express on Cloudflare
   Workers with a D1 database: tables, time slots, reservations, double-booking protection;
   public guest endpoints (availability, create, view, cancel); deployed to `*.workers.dev`.
@@ -400,3 +402,51 @@ Unknown routes → `404 NOT_FOUND`; unexpected errors → `500 INTERNAL` (no sta
 ### 7.3 Merge and push
 - Commit; merge `feature/v2-api` into `main`; push to GitHub (ask first).
 - **Done when:** `main` on GitHub contains v2.
+
+## Implementation notes (2026-11-21)
+
+No plan revisions were needed. Small ordering/how-to differences inside the approved scope:
+
+- **Versions (1.2, 1.6):** pnpm's `minimumReleaseAge` rejected `wrangler@4.166.0` and
+  `@cloudflare/vitest-plugin@1.9.0` (published < 1 day earlier). The first install silently
+  added exclusions to `pnpm-workspace.yaml`; that change was reverted, and the previous
+  releases were pinned: `wrangler@4.165.0`, `@cloudflare/vitest-plugin@1.8.5` (built for it),
+  `vitest@5.1.1`.
+- **2.4:** the duplicate-slot rejection was checked manually with `wrangler d1 execute`; the
+  `batch()` rollback was checked by the automated test in 2.3a, because `d1 execute` does not
+  go through the `batch()` API.
+- **3.2:** the manual spot-check ran through the real `/availability` under `wrangler dev`
+  (first start today = first time ≥ now + 1 h), no temporary logging needed.
+- **3.6 / 4.1:** `HttpError` (`src/errors.ts`) and `src/clock.ts` were created in Phase 3,
+  since the services throw/use them.
+- **R-T1, R-T2:** both resolved positively — Express and the rate limiter work in the test
+  runtime. **R-T3** handled by the live race run (4 × `201`, tables T5–T8, no duplicate cells).
+
+## Revision R1 (2026-11-21) — code review fixes (approved)
+
+**Trigger:** first code review of `main...feature/v2-api` (before merge, step 7.3).
+4 findings, none in the booking core. User approved all four fixes as proposed.
+
+**Changes:**
+- **R1.1 (important):** body errors raised by `express.json()` other than malformed JSON
+  (`entity.too.large`, unsupported charset/encoding, aborted request) fell through to
+  `500 INTERNAL`. Now: body over 10 KB → `413 PAYLOAD_TOO_LARGE` (new error code); any other
+  client body error (http-errors status < 500) → `400 VALIDATION`. `docs/api.md` updated;
+  integration test added.
+- **R1.2 (nit):** keep the `"unknown"` rate-limit key for requests without `CF-Connecting-IP`
+  (Cloudflare always sets it; only local/test calls lack it) — document why in a code comment.
+- **R1.3 (nit):** `race.mjs` success check: OK only if every response is `201` or `SLOT_TAKEN`
+  and at least one booking succeeded; warn when fewer than 4 succeeded (time already partly
+  booked).
+- **R1.4 (nit):** `race.mjs` validates `--n` (integer 1–10) and counts `429 RATE_LIMITED`
+  separately from other failures.
+
+**Steps:** R1.1–R1.4 implemented and committed on `feature/v2-api`; full suite + typecheck;
+redeploy the API (ask first); re-run the live race script; then 7.3.
+
+**R1 result (2026-11-21):** implemented in `75a2e01` (R1.1, R1.2) and `b69494c` (R1.3, R1.4);
+64 tests green; API redeployed; live checks: body over 10 KB → `413 PAYLOAD_TOO_LARGE`,
+`charset=koi8-r` → `400 VALIDATION`; live race run 4 × `201`, 4 × `SLOT_TAKEN`, exit 0.
+Addition inside R1.3 (same script): `process.exitCode` instead of `process.exit()`, because
+exiting while fetch sockets close intermittently aborted Node on Windows
+(`UV_HANDLE_CLOSING` assertion); not seen again in 5 runs after the change.

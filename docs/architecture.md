@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1 implemented, v2 planned** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1 and v2 implemented** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -78,7 +78,7 @@ Learned in v1:
   `drop-trailing-slash` (R2). Checked locally with `wrangler dev`, which emulates the host.
 - The server never sees `#hash`; links that depend on it must change only after hydration.
 
-## API (v2) — planned
+## API (v2) — implemented
 
 Plan: `docs/plans/v2-plan.md`. Contract: `docs/api.md`. Decisions: ADR-011 … ADR-016.
 
@@ -89,7 +89,7 @@ Plan: `docs/plans/v2-plan.md`. Contract: `docs/api.md`. Decisions: ADR-011 … A
 - D1 has **no interactive transactions** (`BEGIN … COMMIT`); atomicity comes from single
   statements and `batch()` (one SQL transaction, rolled back if any statement fails).
 
-Planned layout of `apps/api`:
+What exists in `apps/api` after v2:
 
 ```
 apps/api/
@@ -97,6 +97,8 @@ apps/api/
 ├── src/
 │   ├── index.ts       Express app, routes, CORS, error handler, httpServerHandler export
 │   ├── config.ts      opening hours and booking rules (mirrors docs/cafe.md)
+│   ├── clock.ts       single source of "now" (pinned in tests)
+│   ├── errors.ts      HttpError and error codes (docs/api.md)
 │   ├── time.ts        Kyiv time helpers and time rules (take "now" as a parameter)
 │   ├── validation.ts  zod schemas, phone normalisation
 │   ├── token.ts       token generation and hashing
@@ -113,4 +115,17 @@ stored as Kyiv-local strings (`YYYY-MM-DD`, `HH:MM`, slot `YYYY-MM-DDTHH:MM`).
 
 Booking: validate → check time rules → compute the 3 slot keys → read free fitting tables
 (smallest first) → `batch(insert reservation + 3 slot rows)`; on a primary-key conflict try
-the next table; none left → `409 SLOT_TAKEN`. Cancel: `batch(update status, delete slots)`.
+the next table; none left → `409 SLOT_TAKEN`. Cancel: `batch(update status, delete slots)`;
+the delete only runs if the reservation is cancelled in the same transaction.
+
+Learned in v2:
+- D1 `batch()` really is all-or-nothing: a failing slot insert leaves no reservation row
+  behind (checked by a test against the real migrations).
+- The Workers Vitest integration runs the Express app as is: `exports.default.fetch()` reaches
+  the `httpServerHandler` export; the Rate Limiting binding is simulated too, so the `429` path
+  is tested. Spying on `clock.now` in a test also changes "now" inside the Worker (same isolate).
+- Concurrency: 8 parallel bookings of one slot give exactly 4 successes both locally (10 test
+  runs) and on the live API (`scripts/race.mjs`); losers of a race retry on the next table.
+- pnpm's `minimumReleaseAge` policy rejects packages published less than a day ago; pin the
+  previous release (here `wrangler@4.165.0`, `@cloudflare/vitest-plugin@1.8.5`) instead of
+  adding exclusions.
