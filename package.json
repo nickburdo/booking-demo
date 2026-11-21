@@ -5,6 +5,9 @@
     "dev": "pnpm --filter web dev",
     "generate": "pnpm --filter web generate",
     "preview": "pnpm --filter web preview",
-    "deploy": "pnpm --filter web deploy"
+    "deploy": "pnpm --filter web deploy",
+    "dev:api": "pnpm --filter api dev",
+    "deploy:api": "pnpm --filter api deploy",
+    "test:api": "pnpm --filter api test"
   }
 }
