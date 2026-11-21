@@ -181,3 +181,50 @@ has confirmed it in discussion.
   production secret rejects test tokens. `race.mjs` and `curl` create examples run against a
   local API with the test secret. The chats (v5–v6) will need their own answer to bot
   protection.
+
+## ADR-020 — Admin sessions as bearer tokens
+
+- **Status:** Accepted (2026-11-21, v4 plan)
+- **Context:** The admin pages (web worker) and the API run on different `*.workers.dev`
+  hosts. `workers.dev` is on the Public Suffix List, so they are different sites, and a session
+  cookie set by the API would be a third-party cookie that browsers block.
+- **Decision:** `POST /admin/login` checks one account (`ADMIN_USERNAME` var, `ADMIN_PASSWORD`
+  secret, constant-time comparison, rate-limited) and returns a random token (32 bytes,
+  base64url). The browser keeps it in `sessionStorage` and sends `Authorization: Bearer`.
+  The API stores only its SHA-256 hash in `admin_sessions` with an 8-hour expiry; logout
+  deletes it.
+- **Alternatives rejected:** cookies (third-party, see context); a signed stateless token
+  (cannot be revoked by logout without extra state); Cloudflare Access (ties the demo to a
+  dashboard setup and hides the login flow the demo is meant to show).
+- **Consequences:** Closing a browser tab ends the session on that side. A stolen token works
+  until it expires or the owner logs out. Same hashing approach as guest tokens (ADR-013).
+
+## ADR-021 — Public admin demo with masked guest data
+
+- **Status:** Accepted (2026-11-21, v4 plan)
+- **Context:** The project is a portfolio piece; visitors should be able to try the admin. The
+  live site also takes bookings from real visitors, whose names and phones must not be shown
+  to everyone.
+- **Decision:** The demo credentials are printed on the login page. The admin API always
+  masks guest names (`Olena K.`) and phones (`+380 67 *** ** 67`); full details go only to the
+  owner's Telegram. Admin actions send no Telegram messages. A "demo reservations" endpoint
+  creates up to 6 made-up reservations (phones `+380 00 …`, flagged `is_demo`) through the
+  normal booking code, refused once 20 active demo reservations exist.
+- **Consequences:** Anyone can confirm, cancel or mark reservations, including real ones; this
+  is accepted for a demo. Closing the demo later means changing `ADMIN_PASSWORD` and removing
+  the hint from the page; showing full data to a real owner would need a second role.
+
+## ADR-022 — Reservation status model and transitions
+
+- **Status:** Accepted (2026-11-21, v4 plan)
+- **Decision:** Statuses `pending`, `confirmed`, `cancelled`, `no_show`. `pending` and
+  `confirmed` hold their table slots; `cancelled` and `no_show` are final and free them.
+  Allowed: confirm (`pending`, before start), cancel by the owner or the guest (`pending` /
+  `confirmed`, before start, owner may add a reason), no-show (`pending` / `confirmed`, after
+  start). Each transition is one `UPDATE … WHERE status IN (…)` in the same `batch()` as the
+  slot release, so concurrent actions cannot both succeed. `cancelled_by` records who cancelled.
+- **Alternatives rejected:** undoing a no-show (would have to re-take slots that may already be
+  booked again); a separate `completed` status (nothing in the demo depends on it).
+- **Consequences:** The `CHECK` constraint on `reservations.status` changes, which in SQLite
+  means rebuilding the table (migration `0004`). Interfaces only show actions the API allows;
+  the API stays the authority.

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1, v2 and v3 implemented** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1, v2 and v3 implemented, v4 planned** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -172,3 +172,26 @@ Learned in v3:
   `globalThis.fetch` in a test intercepts the Worker's outbound calls (same isolate).
 - Two background tasks of one booking are unordered; Date.now() does not advance during I/O
   in Workers, so the wait for the first message counts attempts instead of reading the clock.
+
+## Admin: reservation lifecycle (v4) — planned
+
+Plan: `docs/plans/v4-plan.md`. Contract: `docs/api.md` → Admin. Decisions: ADR-020 … ADR-022.
+
+Web (`apps/web`):
+- `pages/admin/login.vue` (demo credentials shown, "fill in" button) and `pages/admin/index.vue`
+  (day view: date + previous/next, status filter, reservation cards, actions, cancel reason,
+  "add demo reservations", logout). Prerendered shells; session and data are read in the
+  browser after hydration (`onNuxtReady`).
+- `composables/useAdminApi.ts`: bearer token from `sessionStorage`; on `401` back to login.
+- Guest page `pages/reservation.vue` shows `confirmed`, `no_show` and the café's cancel reason;
+  the guest can cancel `confirmed` too.
+- Footer link "Admin demo".
+
+API (`apps/api`):
+- Migration `0004`: `reservations` rebuilt with statuses `pending/confirmed/cancelled/no_show`
+  and columns `confirmed_at`, `no_show_at`, `cancelled_by`, `cancel_reason`, `is_demo`;
+  new table `admin_sessions (token_hash, created_at, expires_at)`.
+- `/admin/*` routes behind a `requireAdmin` middleware; login rate-limited by a second binding
+  `LOGIN_LIMITER`; `ADMIN_USERNAME` var, `ADMIN_PASSWORD` secret.
+- Guest names and phones masked in every admin response; admin actions send no Telegram
+  messages.

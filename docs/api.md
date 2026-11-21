@@ -1,8 +1,9 @@
 # Booking API
 
-Status: **v2 — implemented** (2026-11-21); **v3 changes planned** (`docs/plans/v3-plan.md`):
-Turnstile on `POST /reservations`, Telegram notifications. Examples below are real responses
-from the live v2 API (the example reservation was cancelled afterwards).
+Status: **v2 and v3 — implemented** (2026-11-21); **v4 changes planned**
+(`docs/plans/v4-plan.md`): statuses `confirmed` and `no_show`, the [admin endpoints](#admin-v4)
+and new fields on the reservation object. Examples below are real responses from the live v2
+API (the example reservation was cancelled afterwards).
 
 The single backend for every booking interface: the form (v3), the admin (v4) and both chats
 (v5–v6) go through these endpoints and these rules only.
@@ -64,11 +65,15 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 400 | `DATE_OUT_OF_RANGE` | Availability asked for a past date or beyond the 30-day horizon |
 | 400 | `TIME_NOT_BOOKABLE` | Start time off the 30-min grid, outside hours, less than 1 h from now, or beyond the horizon |
 | 400 | `VERIFICATION_FAILED` | Turnstile token missing, invalid, expired or already used (v3) |
-| 404 | `NOT_FOUND` | Unknown route, or no reservation for this token |
+| 401 | `UNAUTHORIZED` | Admin endpoint without a valid session token (missing, unknown or expired) (v4) |
+| 401 | `INVALID_CREDENTIALS` | Admin login with a wrong username or password (v4) |
+| 404 | `NOT_FOUND` | Unknown route, no reservation for this token, or (admin) no reservation with this id |
 | 409 | `SLOT_TAKEN` | No table for this party size is free for the whole 90 minutes |
-| 409 | `NOT_CANCELLABLE` | Reservation already cancelled or already started |
+| 409 | `NOT_CANCELLABLE` | Reservation already cancelled, no-show, or already started |
+| 409 | `NOT_ALLOWED` | Admin action not allowed for the reservation's current status or time (v4) |
+| 409 | `DEMO_LIMIT` | 20 or more active demo reservations already exist (v4) |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
-| 429 | `RATE_LIMITED` | Too many create requests from this IP |
+| 429 | `RATE_LIMITED` | Too many create (or, v4, admin login / demo data) requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
 | 503 | `VERIFICATION_UNAVAILABLE` | Turnstile could not be reached; the booking is refused, try again (v3) |
 
@@ -90,15 +95,24 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 
 The table is assigned by the API and is not part of the guest-facing object.
 
+From v4 the object also has `cancelledBy` (`"guest"`, `"owner"` or `null`) and `cancelReason`
+(the café's optional reason, or `null`), and `status` can be `confirmed` or `no_show`:
+
+```json
+{ "…": "…", "status": "cancelled", "cancelledBy": "owner", "cancelReason": "Private event that evening" }
+```
+
 ### Status lifecycle
 
 ```
-v2:  pending ──(guest cancels)──▶ cancelled
-v4:  pending ──(owner confirms)──▶ confirmed
-     pending / confirmed ──(owner cancels)──▶ cancelled
+v2:  pending ──(guest cancels, before start)──▶ cancelled
+v4:  pending ──(owner confirms, before start)──▶ confirmed
+     pending / confirmed ──(guest or owner cancels, before start)──▶ cancelled
+     pending / confirmed ──(owner marks no-show, after start)──▶ no_show
 ```
 
-A `pending` reservation already holds its table.
+`pending` and `confirmed` hold their table. `cancelled` and `no_show` are final and free it
+(ADR-022).
 
 ## Endpoints
 
@@ -187,7 +201,8 @@ curl https://booking-demo-api.nick-burdo.workers.dev/reservations/<token>
 
 ### `POST /reservations/:token/cancel`
 
-Allowed while the reservation is `pending` and has not started. Frees the table.
+Allowed while the reservation is `pending` (from v4 also `confirmed`) and has not started.
+Frees the table.
 
 ```bash
 curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations/<token>/cancel
@@ -202,6 +217,73 @@ curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations/<token
 Errors: `404 NOT_FOUND`, `409 NOT_CANCELLABLE`.
 
 Side effect (v3): a Telegram message to the owner about the cancellation (best effort).
+
+## Admin (v4)
+
+Endpoints for the café's admin area (ADR-020, ADR-021, ADR-022). The admin is a **public
+demo**: the demo username and password are shown on the site's login page, and guest names
+and phones are always returned masked.
+
+**Session.** `POST /admin/login` returns a session token; every other admin endpoint needs it
+as `Authorization: Bearer <token>`. Sessions last 8 hours; only the token's hash is stored.
+Without a valid token → `401 UNAUTHORIZED`.
+
+**Masking.** `name` → first word plus the initial of the second (`Olena K.`); `phone` → country
+and operator code plus the last two digits (`+380 67 *** ** 67`). Full details reach the owner
+only in Telegram.
+
+**Transition rules** (anything else → `409 NOT_ALLOWED`, with the current status in `message`):
+
+| Action | Allowed from | When |
+|---|---|---|
+| confirm | `pending` | before start |
+| cancel | `pending`, `confirmed` | before start |
+| no-show | `pending`, `confirmed` | after start |
+
+Admin actions send **no** Telegram messages.
+
+### `POST /admin/login`
+
+Body: `{ "username": "demo", "password": "…" }` → `200 { "token": "…", "expiresAt": "2026-12-05T20:00:00.000Z" }`.
+Errors: `400 VALIDATION`, `401 INVALID_CREDENTIALS`, `429 RATE_LIMITED` (10 per 60 s per IP).
+
+### `POST /admin/logout`
+
+Ends the session → `200 { "ok": true }`.
+
+### `GET /admin/reservations?date=YYYY-MM-DD`
+
+All reservations of that day (every status), sorted by start time:
+
+```json
+{
+  "date": "2026-12-05",
+  "reservations": [
+    { "id": "…", "date": "2026-12-05", "time": "19:00", "endTime": "20:30", "guests": 4,
+      "table": "T5", "name": "Olena K.", "phone": "+380 67 *** ** 67",
+      "comment": "Window seat if possible", "status": "pending",
+      "cancelledBy": null, "cancelReason": null, "notified": true, "demo": false }
+  ]
+}
+```
+
+`notified`: the owner's Telegram message about the booking was delivered. `demo`: created by
+the demo-data button. Errors: `400 VALIDATION`, `401 UNAUTHORIZED`.
+
+### `POST /admin/reservations/:id/confirm`
+### `POST /admin/reservations/:id/cancel`
+### `POST /admin/reservations/:id/no-show`
+
+`cancel` takes an optional body `{ "reason": "…" }` (up to 200 characters), shown to the guest
+on the reservation page. Each returns `200 { "reservation": { … } }` (admin shape, as in the
+list). Cancel and no-show free the table. Errors: `400 VALIDATION`, `401 UNAUTHORIZED`,
+`404 NOT_FOUND`, `409 NOT_ALLOWED`.
+
+### `POST /admin/demo-reservations`
+
+Adds up to 6 made-up reservations over the next 3 days at free times (normal booking rules,
+no Telegram), marked as demo → `201 { "created": 6 }`. Errors: `401 UNAUTHORIZED`,
+`409 DEMO_LIMIT` (20 or more active demo reservations), `429 RATE_LIMITED`.
 
 ## How double booking is prevented
 
