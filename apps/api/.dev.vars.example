@@ -1,0 +1,10 @@
+# Local secrets for `wrangler dev` and tests. Copy to .dev.vars (git-ignored).
+# Production values are set with `npx wrangler secret put <NAME>`.
+
+# Cloudflare Turnstile test secret: always passes (accepts only the test token
+# XXXX.DUMMY.TOKEN.XXXX). See ADR-019.
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+
+# Optional: fill in to receive real Telegram messages locally. Empty = notifications skipped.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=

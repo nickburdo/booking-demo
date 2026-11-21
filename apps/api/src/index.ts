@@ -5,7 +5,15 @@ import express, { type ErrorRequestHandler } from "express";
 import { cancelByToken, createReservation, getAvailability, getReservation } from "./booking";
 import { clock } from "./clock";
 import { HttpError } from "./errors";
+import { notifyInBackground } from "./notify";
+import type { TelegramConfig } from "./telegram";
+import { verifyTurnstile } from "./turnstile";
 import { availabilityQuery, parse, reservationBody } from "./validation";
+
+// Secrets may be absent locally; notifications are then skipped (v3 plan, P3).
+function telegramConfig(): TelegramConfig {
+  return { botToken: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID };
+}
 
 // Browser origins allowed to call the API (docs/api.md, ADR-015).
 const ALLOWED_ORIGINS = ["https://booking-demo-web.nick-burdo.workers.dev", "http://localhost:3000"];
@@ -33,9 +41,23 @@ app.post("/reservations", async (req, res) => {
   if (!success) {
     throw new HttpError(429, "RATE_LIMITED", "Too many booking requests. Try again in a minute.");
   }
-  const input = parse(reservationBody, req.body ?? {});
-  const result = await createReservation(env.DB, input, clock.now());
-  res.status(201).json(result);
+  const { turnstileToken, ...input } = parse(reservationBody, req.body ?? {});
+
+  // Bot check after validation, so a single-use token is spent only on a valid request (ADR-019).
+  if (!turnstileToken) {
+    throw new HttpError(400, "VERIFICATION_FAILED", "Bot check token is missing.");
+  }
+  const verdict = await verifyTurnstile(env.TURNSTILE_SECRET, turnstileToken, req.get("cf-connecting-ip"));
+  if (verdict === "failed") {
+    throw new HttpError(400, "VERIFICATION_FAILED", "Bot check failed or expired. Try again.");
+  }
+  if (verdict === "unavailable") {
+    throw new HttpError(503, "VERIFICATION_UNAVAILABLE", "Bot check is unavailable. Try again later.");
+  }
+
+  const { reservation, token, row } = await createReservation(env.DB, input, clock.now());
+  notifyInBackground(env.DB, telegramConfig(), "created", row, clock.now);
+  res.status(201).json({ reservation, token });
 });
 
 app.get("/reservations/:token", async (req, res) => {
@@ -43,7 +65,9 @@ app.get("/reservations/:token", async (req, res) => {
 });
 
 app.post("/reservations/:token/cancel", async (req, res) => {
-  res.json({ reservation: await cancelByToken(env.DB, req.params.token, clock.now()) });
+  const { reservation, row } = await cancelByToken(env.DB, req.params.token, clock.now());
+  notifyInBackground(env.DB, telegramConfig(), "cancelled", row, clock.now);
+  res.json({ reservation });
 });
 
 app.use((_req, _res, next) => {

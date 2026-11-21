@@ -49,6 +49,8 @@ export const reservationBody = z.object({
     .max(500)
     .nullish()
     .transform((v) => (v ? v : null)),
+  // Checked with Turnstile after validation; a missing token is VERIFICATION_FAILED (ADR-019).
+  turnstileToken: z.string().max(2048).optional(),
 });
 
 export type ReservationInput = z.output<typeof reservationBody>;

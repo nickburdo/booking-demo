@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Race demo: fires N concurrent bookings for 4 guests at one date/time and shows that
 // exactly as many succeed as there are 4-seat tables (4). Created reservations are
-// cancelled at the end. Not a test: a demo you run against a local or live API.
+// cancelled at the end. Not a test: a demo.
+//
+// Since v3 it runs against a LOCAL API only: it sends Turnstile's test token, which the
+// local API accepts (test secret in .dev.vars) and the live API rejects (ADR-019).
 //
 // Usage:
 //   node scripts/race.mjs [--base URL] [--date YYYY-MM-DD] [--time HH:MM] [--n 8]
@@ -66,7 +69,14 @@ const results = await Promise.all(
     const res = await fetch(`${base}/reservations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ date, time, guests, name: `Race ${i + 1}`, phone: "+380000000000" }),
+      body: JSON.stringify({
+        date,
+        time,
+        guests,
+        name: `Race ${i + 1}`,
+        phone: "+380000000000",
+        turnstileToken: "XXXX.DUMMY.TOKEN.XXXX",
+      }),
     });
     return { i: i + 1, status: res.status, body: await json(res) };
   }),

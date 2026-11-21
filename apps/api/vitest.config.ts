@@ -9,13 +9,20 @@ export default defineConfig({
       return {
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          // Test-only binding: the setup file applies these migrations to the local D1.
-          bindings: { TEST_MIGRATIONS: migrations },
+          bindings: {
+            // Test-only binding: the setup file applies these migrations to the local D1.
+            TEST_MIGRATIONS: migrations,
+            // Fixed secrets so tests never depend on a developer's .dev.vars; outbound
+            // calls to Turnstile and Telegram are mocked in test/outbound.ts.
+            TURNSTILE_SECRET: "test-turnstile-secret",
+            TELEGRAM_BOT_TOKEN: "test-bot-token",
+            TELEGRAM_CHAT_ID: "42",
+          },
         },
       };
     }),
   ],
   test: {
-    setupFiles: ["./test/apply-migrations.ts"],
+    setupFiles: ["./test/apply-migrations.ts", "./test/outbound.ts"],
   },
 });

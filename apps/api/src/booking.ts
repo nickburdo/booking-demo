@@ -63,7 +63,7 @@ export async function createReservation(
   db: D1Database,
   input: ReservationInput,
   now: Date,
-): Promise<{ reservation: ReservationDto; token: string }> {
+): Promise<{ reservation: ReservationDto; token: string; row: ReservationRow }> {
   if (!isStartBookable(input.date, input.time, now)) {
     throw new HttpError(
       400,
@@ -86,6 +86,8 @@ export async function createReservation(
     token_hash: await hashToken(token),
     created_at: now.toISOString(),
     cancelled_at: null,
+    notified_at: null,
+    cancel_notified_at: null,
   };
 
   // Try free tables smallest-first. A conflict means another request took that table
@@ -94,7 +96,7 @@ export async function createReservation(
     const row: ReservationRow = { ...base, table_id: table.id };
     try {
       await insertReservation(db, row, slots);
-      return { reservation: toDto(row), token };
+      return { reservation: toDto(row), token, row };
     } catch (error) {
       if (!isSlotConflict(error)) throw error;
     }
@@ -115,7 +117,7 @@ export async function cancelByToken(
   db: D1Database,
   token: string,
   now: Date,
-): Promise<ReservationDto> {
+): Promise<{ reservation: ReservationDto; row: ReservationRow }> {
   const row = await findOrThrow(db, token);
   const notCancellable = new HttpError(
     409,
@@ -127,7 +129,8 @@ export async function cancelByToken(
   }
   const cancelledAt = now.toISOString();
   if (!(await cancelReservation(db, row.id, cancelledAt))) throw notCancellable;
-  return toDto({ ...row, status: "cancelled", cancelled_at: cancelledAt });
+  const cancelled: ReservationRow = { ...row, status: "cancelled", cancelled_at: cancelledAt };
+  return { reservation: toDto(cancelled), row: cancelled };
 }
 
 async function findOrThrow(db: D1Database, token: string): Promise<ReservationRow> {
