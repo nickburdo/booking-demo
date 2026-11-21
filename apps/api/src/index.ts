@@ -2,13 +2,22 @@ import { httpServerHandler } from "cloudflare:node";
 import { env } from "cloudflare:workers";
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
+import { addDemoReservations, applyAction, listDay, type AdminAction } from "./admin";
+import { login, logout, requireAdmin } from "./auth";
 import { cancelByToken, createReservation, getAvailability, getReservation } from "./booking";
 import { clock } from "./clock";
 import { HttpError } from "./errors";
 import { notifyInBackground } from "./notify";
 import type { TelegramConfig } from "./telegram";
 import { verifyTurnstile } from "./turnstile";
-import { availabilityQuery, parse, reservationBody } from "./validation";
+import {
+  adminCancelBody,
+  adminDayQuery,
+  availabilityQuery,
+  loginBody,
+  parse,
+  reservationBody,
+} from "./validation";
 
 // Secrets may be absent locally; notifications are then skipped (v3 plan, P3).
 function telegramConfig(): TelegramConfig {
@@ -69,6 +78,49 @@ app.post("/reservations/:token/cancel", async (req, res) => {
   notifyInBackground(env.DB, telegramConfig(), "cancelled", row, clock.now);
   res.json({ reservation });
 });
+
+// --- Admin (v4): docs/api.md → Admin, ADR-020…022 -----------------------------------------
+
+/** Login and demo data share one per-IP limiter (v4 plan, P3); prefixes keep the counts apart. */
+async function limitAdmin(kind: string, ip: string | undefined): Promise<void> {
+  const { success } = await env.LOGIN_LIMITER.limit({ key: `${kind}:${ip ?? "unknown"}` });
+  if (!success) throw new HttpError(429, "RATE_LIMITED", "Too many attempts. Try again in a minute.");
+}
+
+app.post("/admin/login", async (req, res) => {
+  await limitAdmin("login", req.get("cf-connecting-ip"));
+  const { username, password } = parse(loginBody, req.body ?? {});
+  const account = { username: env.ADMIN_USERNAME, password: env.ADMIN_PASSWORD };
+  res.json(await login(env.DB, account, username, password, clock.now()));
+});
+
+const admin = express.Router();
+admin.use(requireAdmin(() => env.DB, () => clock.now()));
+
+admin.post("/logout", async (_req, res) => {
+  await logout(env.DB, res.locals.sessionHash);
+  res.json({ ok: true });
+});
+
+admin.get("/reservations", async (req, res) => {
+  const { date } = parse(adminDayQuery, req.query);
+  res.json({ date, reservations: await listDay(env.DB, date) });
+});
+
+for (const action of ["confirm", "cancel", "no-show"] as AdminAction[]) {
+  admin.post(`/reservations/:id/${action}`, async (req, res) => {
+    const reason = action === "cancel" ? parse(adminCancelBody, req.body ?? {}).reason : null;
+    // No Telegram for admin actions: demo visitors would spam the owner's chat (ADR-021).
+    res.json({ reservation: await applyAction(env.DB, req.params.id, action, clock.now(), reason) });
+  });
+}
+
+admin.post("/demo-reservations", async (req, res) => {
+  await limitAdmin("demo", req.get("cf-connecting-ip"));
+  res.status(201).json({ created: await addDemoReservations(env.DB, clock.now()) });
+});
+
+app.use("/admin", admin);
 
 app.use((_req, _res, next) => {
   next(new HttpError(404, "NOT_FOUND", "Route not found."));

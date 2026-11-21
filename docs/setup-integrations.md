@@ -158,3 +158,18 @@ Steps:
    Wrangler reads `.dev.vars` only at start.
 6. Make a booking on the local site: a message from the bot should arrive.
 
+
+## 6. Admin demo password (v4)
+
+The admin area has one account: username `demo` (set in `apps/api/wrangler.jsonc`) and the
+password from the API secret `ADMIN_PASSWORD`. While the admin is a public demo (ADR-021), the
+password is **not a secret**: the login page shows it.
+
+- Local: `apps/api/.dev.vars` has `ADMIN_PASSWORD=linden-demo` (copied from
+  `.dev.vars.example`).
+- Production: from `apps/api`, run `npx wrangler secret put ADMIN_PASSWORD`, wait for
+  `Enter a secret value:`, type the demo password (the one the login page shows) and press
+  Enter.
+
+To close the demo later, put a different, private password with the same command and remove
+the demo hint from the login page.

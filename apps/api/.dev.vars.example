@@ -8,3 +8,6 @@ TURNSTILE_SECRET=1x0000000000000000000000000000000AA
 # Optional: fill in to receive real Telegram messages locally. Empty = notifications skipped.
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+
+# Admin demo password (v4, ADR-021). Public on purpose: the login page shows it.
+ADMIN_PASSWORD=linden-demo
