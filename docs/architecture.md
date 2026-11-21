@@ -1,7 +1,8 @@
 # Architecture
 
-Status: **target architecture**. Parts are marked with the version that introduces them.
-This file is updated at the end of every version to reflect what actually exists.
+Status: **target architecture; v1 implemented** (2026-11-21). Parts are marked with the
+version that introduces them. This file is updated at the end of every version to reflect
+what actually exists.
 
 ## Components
 
@@ -33,12 +34,17 @@ booking-demo/
 │   ├── architecture.md
 │   ├── decisions.md
 │   ├── cafe.md     fictional coffee shop content (source of truth)
+│   ├── design.md   visual design (v1)
 │   └── plans/      one plan per version
+├── README.md
 ├── package.json
 └── pnpm-workspace.yaml
 ```
 
-## Web (v1)
+## Web (v1) — implemented
+
+Live: https://booking-demo-web.nick-burdo.workers.dev
+
 
 - Nuxt 4, `nuxt generate` (static site generation), output `.output/public`.
 - Deployed as a Cloudflare Worker with static assets only (no Worker script).
@@ -49,6 +55,27 @@ booking-demo/
 - Map: Leaflet via `@nuxtjs/leaflet`, OpenStreetMap tiles, rendered client-side only.
 - Content (menu, hours, address) comes from a typed data file in the app,
   mirroring `docs/cafe.md`.
+
+What exists in `apps/web` after v1:
+- `app/data/cafe.ts` — typed content; `app/data/site.ts` — repo link, photo credit.
+- `app/components/` — one component per section: `SiteHeader` (sticky, nav, language
+  switcher, mobile menu), `HeroSection`, `MenuSection`, `HoursSection`, `LocationSection`
+  (map in `<ClientOnly>`), `BookingSection`, `SiteFooter`.
+- `app/plugins/remember-locale.client.ts` — saves the switched language, restores it on `/`.
+- `app/app.vue` — per-locale head via `useLocaleHead` (`lang`, title, description,
+  absolute `hreflang` and canonical links thanks to `i18n.baseUrl`).
+- `app/assets/css/main.css` — Tailwind `@theme` tokens from `docs/design.md`, fonts
+  from `@fontsource-variable/*`, smooth scrolling unless reduced motion is requested.
+- `public/images/hero-*.webp` — hero photo in two widths, served with `srcset`.
+- `wrangler.jsonc` — assets-only Worker `booking-demo-web`: `not_found_handling: "404-page"`,
+  `html_handling: "drop-trailing-slash"`. Deploy: `pnpm deploy` from the repo root.
+
+Learned in v1:
+- A static host has no page for `/` under the i18n `prefix` strategy → switched to
+  `prefix_except_default` (plan revision R1).
+- Workers static assets add a trailing slash to folder pages by default; Nuxt links have none →
+  `drop-trailing-slash` (R2). Checked locally with `wrangler dev`, which emulates the host.
+- The server never sees `#hash`; links that depend on it must change only after hydration.
 
 ## API (v2+)
 

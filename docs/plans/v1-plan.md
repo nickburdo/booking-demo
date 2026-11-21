@@ -1,6 +1,6 @@
 # v1 plan — Landing page
 
-- **Status:** Approved (2026-11-21); revisions R1–R6 approved (2026-11-21)
+- **Status:** Done (2026-11-21) — live at https://booking-demo-web.nick-burdo.workers.dev; revisions R1–R6 approved and implemented; step 8.4 (GitHub) follows
 - **Scope:** stage 0 of the roadmap (`docs/overview.md`): one-page site with menu, opening
   hours, map, "booking coming soon" section; EN/RU/UK; responsive; deployed to Cloudflare.
 - **Out of scope:** any backend, database, booking logic, forms, chat, analytics,
@@ -345,4 +345,6 @@ then, e.g. a static redirect rule or a tiny Worker script).
 ### 8.4 Publish to GitHub
 - Create public repo `booking-demo` with `gh`, push `main` (ask first); put the repo link
   into the footer and README; redeploy.
+- (user, 2026-11-21) Before publishing: MIT `LICENSE` added at the root; Nuxt's starter
+  `apps/web/README.md` removed.
 - **Done when:** repo is public, live site footer links to it.
