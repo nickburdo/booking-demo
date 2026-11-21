@@ -137,8 +137,8 @@ Checked widths in step 6.1: 375, 768, 1280.
     demo reservations" outline button on the right (below the list on mobile). Day heading
     Unbounded 400 20px with "N reservations · M guests" in steam. Status filter chips (36px,
     white with `line` border; selected = espresso with milk text) with counts.
-  - **Rows:** desktop grid — time–end (tabular, 600) · table + guests · masked name / phone
-    (steam) / comment · status · actions on the right; 1px `line` between rows. Mobile: cards
+  - **Rows:** from `lg` (1024px) a grid — time–end (tabular, 600) · table + guests · masked name / phone
+    (steam) / comment · status · actions on the right; 1px `line` between rows. Below `lg`: cards
     (time · table · guests and the status on one line, guest below, actions under them).
     Cancelled and no-show rows in steam colour. Small "DEMO" tag for demo reservations;
     "⚠ Telegram not delivered" under the status when the owner was not notified.

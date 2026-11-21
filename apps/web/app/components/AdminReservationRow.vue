@@ -44,20 +44,20 @@ watch(() => props.reservation.status, () => (panel.value = null))
 
 <template>
   <li
-    class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-b border-line py-4 md:grid-cols-[112px_96px_1fr_170px_minmax(0,280px)] md:gap-4"
+    class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-b border-line py-4 lg:grid-cols-[112px_96px_1fr_170px_minmax(0,280px)] lg:gap-4"
     :class="{ 'text-steam': !live }"
   >
-    <!-- Mobile first line: time · table · guests, status on the right -->
-    <p class="font-semibold tabular-nums md:hidden">
+    <!-- Below lg (phones, tablets): card layout; first line time · table · guests, status on the right -->
+    <p class="font-semibold tabular-nums lg:hidden">
       {{ reservation.time }}–{{ reservation.endTime }} · {{ reservation.table }} · {{ t('admin.guests', reservation.guests) }}
     </p>
-    <p class="font-semibold tabular-nums max-md:hidden">{{ reservation.time }}–{{ reservation.endTime }}</p>
-    <p class="max-md:hidden">
+    <p class="font-semibold tabular-nums max-lg:hidden">{{ reservation.time }}–{{ reservation.endTime }}</p>
+    <p class="max-lg:hidden">
       <span class="font-semibold">{{ reservation.table }}</span>
       <span class="text-[15px] text-steam"> · {{ t('admin.guests', reservation.guests) }}</span>
     </p>
 
-    <div class="max-md:order-3 max-md:col-span-2">
+    <div class="max-lg:order-3 max-lg:col-span-2">
       <p class="font-medium">
         {{ reservation.name }}
         <span v-if="reservation.demo" class="ml-1.5 rounded border border-line px-1.5 text-[11px] font-semibold tracking-wide text-steam uppercase">{{ t('admin.demoTag') }}</span>
@@ -67,12 +67,12 @@ watch(() => props.reservation.status, () => (panel.value = null))
       <p v-if="reservation.cancelReason" class="mt-1 text-[15px]">{{ t('admin.reasonShown', { reason: reservation.cancelReason }) }}</p>
     </div>
 
-    <div class="text-right md:text-left max-md:order-2">
+    <div class="text-right lg:text-left max-lg:order-2">
       <span class="inline-block rounded-md px-2 py-0.5 text-[13px] font-semibold text-espresso" :class="pillClass">{{ statusLabel }}</span>
       <span v-if="live && !reservation.notified" class="mt-1 block text-[13px] text-[#8a5a00]">⚠ {{ t('admin.notNotified') }}</span>
     </div>
 
-    <div class="flex flex-wrap items-start gap-2 max-md:order-4 max-md:col-span-2 max-md:mt-1 md:justify-end">
+    <div class="flex flex-wrap items-start gap-2 max-lg:order-4 max-lg:col-span-2 max-lg:mt-1 lg:justify-end">
       <template v-if="panel === null">
         <button v-if="canConfirm" type="button" class="btn-primary !px-3.5 !py-2 text-[15px] disabled:opacity-70" :disabled="busy" @click="emit('act', 'confirm')">
           {{ t('admin.actions.confirm') }}
@@ -97,7 +97,7 @@ watch(() => props.reservation.status, () => (panel.value = null))
 
     <form
       v-if="panel === 'cancel'"
-      class="col-span-2 rounded-[10px] border-2 border-line bg-white p-3.5 max-md:order-5 md:col-start-3 md:col-end-6"
+      class="col-span-2 rounded-[10px] border-2 border-line bg-white p-3.5 max-lg:order-5 lg:col-start-3 lg:col-end-6"
       @submit.prevent="emit('act', 'cancel', reason.trim())"
     >
       <label :for="reasonId" class="text-[15px] font-medium">{{ t('admin.reasonLabel') }}</label>
@@ -113,6 +113,6 @@ watch(() => props.reservation.status, () => (panel.value = null))
       </div>
     </form>
 
-    <p v-if="error" role="alert" class="col-span-2 text-[15px] text-error max-md:order-6 md:col-start-3 md:col-end-6">{{ error }}</p>
+    <p v-if="error" role="alert" class="col-span-2 text-[15px] text-error max-lg:order-6 lg:col-start-3 lg:col-end-6">{{ error }}</p>
   </li>
 </template>
