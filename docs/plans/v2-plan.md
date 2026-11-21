@@ -1,7 +1,8 @@
 # v2 plan — Booking API and database
 
 - **Status:** Done (2026-11-21) — API live at https://booking-demo-api.nick-burdo.workers.dev;
-  automated tests green; revision R1 (code review fixes) approved. Notes at the end of this file.
+  64 automated tests green; revision R1 (code review fixes) implemented and redeployed.
+  Notes at the end of this file.
 - **Scope:** stage v2 of the roadmap (`docs/overview.md`): `apps/api` — Express on Cloudflare
   Workers with a D1 database: tables, time slots, reservations, double-booking protection;
   public guest endpoints (availability, create, view, cancel); deployed to `*.workers.dev`.
@@ -442,3 +443,10 @@ No plan revisions were needed. Small ordering/how-to differences inside the appr
 
 **Steps:** R1.1–R1.4 implemented and committed on `feature/v2-api`; full suite + typecheck;
 redeploy the API (ask first); re-run the live race script; then 7.3.
+
+**R1 result (2026-11-21):** implemented in `75a2e01` (R1.1, R1.2) and `b69494c` (R1.3, R1.4);
+64 tests green; API redeployed; live checks: body over 10 KB → `413 PAYLOAD_TOO_LARGE`,
+`charset=koi8-r` → `400 VALIDATION`; live race run 4 × `201`, 4 × `SLOT_TAKEN`, exit 0.
+Addition inside R1.3 (same script): `process.exitCode` instead of `process.exit()`, because
+exiting while fetch sockets close intermittently aborted Node on Windows
+(`UV_HANDLE_CLOSING` assertion); not seen again in 5 runs after the change.

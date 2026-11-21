@@ -203,8 +203,8 @@ Target: 2026-11-28 20:30, 4 guests, 8 concurrent requests
   request  7: 201  reservation af5213d8-…
   request  8: 201  reservation e77fd5f9-…
 
-4 booked, 4 SLOT_TAKEN, 0 other — in 398 ms
-OK: no more bookings than 4-seat tables.
+4 booked, 4 SLOT_TAKEN, 0 RATE_LIMITED, 0 other — in 398 ms
+OK: 4 booking(s), never more than 4 4-seat tables.
 ```
 
 The four successful bookings landed on tables T5–T8, one each; no `(table, slot)` pair was
