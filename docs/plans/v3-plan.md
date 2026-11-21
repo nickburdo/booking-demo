@@ -1,6 +1,6 @@
 # v3 plan — Booking form and Telegram notifications
 
-- **Status:** Approved (2026-11-21) — in progress
+- **Status:** Done (2026-11-21) — live; revisions R1–R4
 - **Scope:** stage v3 of the roadmap (`docs/overview.md`): a booking form on the landing page
   (`#booking`) that uses the v2 API; a guest reservation page (view + cancel by private link);
   Telegram notifications to the owner on new and cancelled reservations; Cloudflare Turnstile
@@ -105,6 +105,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 - **Done when:** on the branch.
 
 ### 1.2 Telegram bot (user)
+- Steps: [`docs/setup-integrations.md`](../setup-integrations.md) (added in R2).
 - User creates a bot in @BotFather and sends it `/start` from their account; I give exact steps.
   User reads their `chat_id` (I provide a `curl …/getUpdates` command to run locally).
 - Token and chat id are **not** pasted into the chat; the user stores them with
@@ -113,6 +114,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 - **Done when:** `wrangler secret list` shows both names.
 
 ### 1.3 Turnstile widget (user)
+- Steps: [`docs/setup-integrations.md`](../setup-integrations.md) (added in R2).
 - User creates a widget in the Cloudflare dashboard (Turnstile → Add widget), hostnames
   `booking-demo-web.nick-burdo.workers.dev` and `localhost`, mode "Managed". Site key may be
   shared in the chat (it is public); secret goes via `wrangler secret put TURNSTILE_SECRET`.
@@ -203,6 +205,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
   focus visible; error states by forcing each code (validation, slot taken, verification failed,
   API down).
 ### 4.3 Reservation page: open link in a new tab, cancel, reload, wrong token, other language.
+  With a **real token on the built site** (added in R3: the prerendered page behaves differently from dev).
 ### 4.4 Telegram: real messages for create and cancel arrive with correct Ukrainian text.
 - **Done when:** all pass; issues fixed within scope or raised.
 
@@ -218,6 +221,102 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
 ## Phase 6 — Review and wrap-up
 
 ### 6.1 Code review of `main...feature/v3-booking-form`; findings discussed; fixes via plan revision.
-### 6.2 README (how to run with `.env` / `.dev.vars`, Telegram/Turnstile setup), `docs/architecture.md`
+### 6.2 README (how to run with `.env.local` / `.dev.vars`, link to `docs/setup-integrations.md`), `docs/architecture.md`
   (v3 implemented, learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first).
+
+## Revision R1 (2026-11-21) — local site config must not reach the production build (approved)
+
+**Trigger:** after Phase 3, `nuxt generate` was found to read `apps/web/.env` too: the build
+baked in `apiBase: "http://localhost:8787"` and the Turnstile test site key. `pnpm deploy`
+would have shipped them. Nothing was deployed.
+
+**Decision (user):** local values live in `apps/web/.env.local`, loaded only explicitly:
+- `dev` script → `nuxt dev --dotenv .env.local`;
+- new `generate:local` script → `nuxt generate --dotenv .env.local` (local built-site checks);
+- `generate` / `deploy` load no env file, so they use the live defaults from `nuxt.config.ts`;
+- `.env.example` (committed) now says "copy to `.env.local`".
+Rejected: setting `NUXT_PUBLIC_*` in the deploy script (needs `cross-env` on Windows; a plain
+`pnpm generate` would still pick up `.env`).
+
+**Also decided (user):** Phase 4 runs on the built site (`generate:local`) served by
+`wrangler dev` on port 3000 (the only local origin the API allows); the user stops their dev
+server for it.
+
+**Done when:** `pnpm generate` output contains the live `apiBase` and no test site key;
+`generate:local` output contains the local values.
+
+## Revision R2 (2026-11-21) — setup steps as a separate doc (approved)
+
+**Trigger:** the Telegram/Turnstile setup steps were only given in the chat and were hard to find.
+
+**Decision (user):** the steps live in `docs/setup-integrations.md` (bot, chat id, Turnstile widget,
+`wrangler secret put`, optional local `.dev.vars`). Phase 1.2/1.3 and 6.2 link to it; the README
+links to it instead of repeating the steps.
+
+**Done when:** the file exists and is linked from this plan (now) and the README (6.2).
+
+## Revision R3 (2026-11-21) — reservation page lost the token on the live site (approved)
+
+**Trigger:** in 5.4 the link from the confirmation opened `/reservation#<token>` with
+"Booking not found" and no API request. Cause: the page is prerendered for `/reservation`;
+when hydrating a different URL, Nuxt 4.6 first shows the prerendered route and restores the real
+one on `app:suspense:resolve` ("deferred route", `nuxt/dist/pages/runtime/plugins/router.js`).
+`onMounted` ran in between and read an empty `window.location.hash`. Dev mode has no prerender,
+and Phase 4 tested only wrong/empty tokens on the built site, so this was missed.
+
+**Decision (user):**
+- `reservation.vue` reads the token in `onNuxtReady` from `useRoute().hash`.
+- Re-test on the built site (`generate:local`): book → open link → view → cancel → switch
+  language; wrong and empty token. Phase 4.3 now names the real-token check explicitly.
+- Redeploy web (repeat 5.3), then 5.4.
+
+**Done when:** the live link opens the booking and cancel works.
+
+## Revision R4 (2026-11-21) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v3-booking-form` found 7 issues; all were
+confirmed in the code. The user chose to fix all of them, including the notification order.
+
+### R4.1 Form: API errors for `date` / `guests` are never shown (`BookingForm.vue`)
+- Show `fieldErrors.date` under the date input and `fieldErrors.guests` under the guests group
+  (same `field-error` style, `aria-invalid` / `aria-describedby` like the other fields).
+
+### R4.2 Form: clearing the date keeps the old times and the selected time
+- `loadTimes`: when the date is empty, clear `times` and `time`, set `timesState` to `idle`.
+- `checkLocally`: an empty date is a local error (`booking.fieldErrors.date`, key exists).
+
+### R4.3 Form: "Book another" reuses the spent Turnstile token
+- `bookAnother` sets `turnstileToken` to `null` and `turnstileFailed` to `false`; the remounted
+  widget issues a new token.
+
+### R4.4 API: the cancel message can arrive before the new-booking message (`notify.ts`)
+- Before sending a "cancelled" message, the background task re-reads the row and waits until
+  `notified_at` is set: check every 500 ms, up to 10 s (well inside the `waitUntil` limit).
+  If it is still empty after that (the first message failed), send the cancel message anyway.
+- If Telegram is not configured, nothing changes (both are skipped).
+- Tests (`apps/api/test/v3.test.ts`): cancel right after create sends "created" first, then
+  "cancelled"; cancel still sends after the wait when the "created" message failed.
+- ADR-018: describe the ordering rule and its limit (best effort, 10 s).
+
+### R4.5 Reservation page: a malformed hash leaves it on "Loading…" forever (`reservation.vue`)
+- Wrap the token decode in `try/catch`; on failure show "Booking not found".
+
+### R4.6 Form: "bot check could not load" comes back after the widget recovered
+- Set `turnstileFailed` to `false` when a non-null token arrives.
+
+### R4.7 Form: `DATE_OUT_OF_RANGE` shows a generic error / a useless "Try again"
+- New i18n key `booking.errors.DATE_OUT_OF_RANGE` (en/ru/uk): "This date is no longer
+  available. Pick another date."
+- On this code (from availability or create): recompute the bookable range, move the date to
+  the new first day if it fell out, show the message, reload times.
+
+### Verification
+- API: `pnpm --filter api test` and typecheck green.
+- Web, on the built site (`generate:local` + local API): R4.1 / R4.7 by forcing the API answer
+  (as in Phase 4), R4.2 / R4.3 / R4.5 / R4.6 by hand; R4.4 locally with real Telegram
+  (book → cancel at once → order in the chat).
+- Then redeploy API and web (ask first), short live check.
+
+**Done when:** all of the above pass; review findings closed.
+

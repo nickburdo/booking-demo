@@ -1,0 +1,160 @@
+# Setup: Telegram bot and Turnstile (v3)
+
+One-time steps for the owner of the deployment. They create the three secrets the API needs
+(ADR-018, ADR-019) and the public Turnstile site key the website needs.
+
+| Value | Where it comes from | Secret? | Where it goes |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | @BotFather | **yes** | `wrangler secret put`, optionally `apps/api/.dev.vars` |
+| `TELEGRAM_CHAT_ID` | Telegram `getUpdates` | **yes** (treat as private) | `wrangler secret put`, optionally `apps/api/.dev.vars` |
+| `TURNSTILE_SECRET` | Cloudflare dashboard | **yes** | `wrangler secret put` only |
+| Turnstile site key | Cloudflare dashboard | no (it is in every page) | `apps/web/nuxt.config.ts` → `runtimeConfig.public.turnstileSiteKey` |
+
+No need to keep a private copy of the values: each can be found again at its source.
+- Bot token: @BotFather → `/mybots` → the bot → **API Token**.
+- Chat id: run `getUpdates` again (step 2).
+- Turnstile keys: Cloudflare dashboard → **Turnstile** → the widget → **Settings**.
+- Values stored with `wrangler secret put` cannot be read back; put them again if needed.
+
+Rules:
+- Never commit secret values, never paste them into chats, issues or screenshots.
+- `apps/api/.dev.vars` and `apps/web/.env.local` are git-ignored; the `.example` files next to
+  them are the committed templates.
+- If a secret leaks, revoke it (BotFather `/revoke`, or rotate the Turnstile secret key in the
+  dashboard) and put the new value again. When BotFather asks which bot, tap the bot's button
+  on its keyboard, or send the username with `@` (e.g. `@my_bot`); a bare username or the
+  display name gives "Invalid bot selected". `/mybots` shows the exact username.
+
+## 1. Telegram bot
+
+1. In Telegram, open **@BotFather** and send `/newbot`.
+2. Enter a display name (e.g. `Linden Coffee Bookings`), then a username ending in `bot`
+   (e.g. `linden_coffee_bookings_bot`). It must be unique across Telegram.
+3. BotFather replies with the **bot token**, which looks like `1234567890:AAE…`.
+   Copy it somewhere private for the next steps. Do not share it.
+4. Open the link to your new bot from BotFather's message and press **Start** (or send any
+   message). A bot cannot write to a user who has never started it, and step 2 below needs
+   at least one message from you.
+
+## 2. Chat id
+
+The chat id of a private chat with the bot is your Telegram user id (a positive number).
+
+1. Make sure you have sent the bot at least one message (step 1.4).
+2. In PowerShell, replace `<TOKEN>` with the bot token and run:
+
+   ```powershell
+   (Invoke-RestMethod "https://api.telegram.org/bot<TOKEN>/getUpdates").result.message.chat.id
+   ```
+
+   Or with real curl, and look for `"chat":{"id":…}` in the output. In Windows PowerShell 5.1,
+   plain `curl` is an alias of `Invoke-WebRequest`, which cuts the response off with `...`, so
+   type `curl.exe` there:
+
+   ```sh
+   curl.exe "https://api.telegram.org/bot<TOKEN>/getUpdates"
+   ```
+
+3. The printed number is the **chat id**. In a private chat it equals `message.from.id`
+   (your user id), so if the output is cut off before `"chat"`, the `"from":{"id":…}` number
+   is the same value.
+   - Empty output: send the bot another message and run the command again (updates are kept
+     for about 24 hours).
+   - The same id printed several times: that is fine, one per message.
+
+Optional check that the bot can write to you (replace both placeholders):
+
+```powershell
+Invoke-RestMethod "https://api.telegram.org/bot<TOKEN>/sendMessage" -Method Post -Body @{ chat_id = "<CHAT_ID>"; text = "test" }
+```
+
+These commands leave the token in the shell history. In PowerShell, `Clear-History` is not
+enough: the arrow-key history comes from PSReadLine, which also saves it to a file. To remove
+the lines with the token (then close all terminal windows):
+
+```powershell
+$p = (Get-PSReadLineOption).HistorySavePath
+(Get-Content $p) | Where-Object { $_ -notmatch 'api\.telegram\.org' } | Set-Content $p -Encoding utf8
+[Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()
+```
+
+## 3. Turnstile widget
+
+1. Open the Cloudflare dashboard → **Turnstile** → **Add widget**.
+2. Fill in:
+   - **Widget name:** e.g. `booking-demo`.
+   - **Hostnames:** `booking-demo-web.nick-burdo.workers.dev` and `localhost`.
+   - **Widget mode:** Managed.
+   - **Skip future security rule challenges for verified visitors** (this is pre-clearance):
+     leave the toggle off. It only matters for sites proxied through Cloudflare on their own
+     zone, not for `*.workers.dev`.
+3. Create the widget. The dashboard shows two keys:
+   - **Site Key** — public. It goes into `apps/web/nuxt.config.ts`
+     (`runtimeConfig.public.turnstileSiteKey`) and is baked into the site at build time.
+   - **Secret Key** — private. It goes only into the API secret `TURNSTILE_SECRET`.
+
+Local development does not use these keys: `apps/web/.env.local` and `apps/api/.dev.vars`
+hold Cloudflare's public test keys (always pass), see ADR-019.
+
+## 4. Store the production secrets
+
+The value is never typed into the command itself. Wrangler asks for it after the command
+starts, so it does not end up in the shell history.
+
+1. Open a terminal in the API folder:
+
+   ```sh
+   cd apps/api
+   ```
+
+2. Run the command for the first secret (only the name, no value):
+
+   ```sh
+   npx wrangler secret put TELEGRAM_BOT_TOKEN
+   ```
+
+3. Wait for the prompt `Enter a secret value:`. Paste the bot token and press Enter.
+   Nothing is shown while you paste: that is expected.
+4. Wait for `✨ Success! Uploaded secret TELEGRAM_BOT_TOKEN`.
+5. Repeat steps 2–4 for the other two secrets:
+   - `npx wrangler secret put TELEGRAM_CHAT_ID` → paste the chat id;
+   - `npx wrangler secret put TURNSTILE_SECRET` → paste the Turnstile **Secret Key**.
+6. Check:
+
+   ```sh
+   npx wrangler secret list
+   ```
+
+   It must list all three names. Values are never shown.
+
+Each `secret put` applies to the deployed Worker right away. A mistyped value is fixed by
+running the same `secret put` again.
+
+## 5. Optional: real Telegram messages from the local API
+
+**Why a second place.** The secrets from step 4 live in Cloudflare and are used only by the
+deployed API. The API running on your computer (`wrangler dev`) does not see them: it reads
+its secrets from the local file `apps/api/.dev.vars`. That file is git-ignored.
+
+**When you need it.** Only if you want the local API to send real Telegram messages, e.g. to
+check the message texts before deploying. Without it everything else works locally; the API
+just skips notifications and logs a warning.
+
+Steps:
+
+1. Open `apps/api/.dev.vars` (if it does not exist, copy `apps/api/.dev.vars.example` to it).
+2. Put the values right after `=`, without quotes or spaces:
+
+   ```
+   TELEGRAM_BOT_TOKEN=1234567890:AAE...
+   TELEGRAM_CHAT_ID=123456789
+   ```
+
+3. Do **not** change the `TURNSTILE_SECRET` line: it must stay at the test value
+   `1x0000000000000000000000000000000AA`. The local site uses the Turnstile test site key,
+   and the real Secret Key would reject it.
+4. Save the file.
+5. Restart the local API: stop `pnpm --filter api dev` with Ctrl+C and start it again.
+   Wrangler reads `.dev.vars` only at start.
+6. Make a booking on the local site: a message from the bot should arrive.
+

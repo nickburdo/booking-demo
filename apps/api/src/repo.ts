@@ -16,6 +16,8 @@ export interface ReservationRow {
   token_hash: string;
   created_at: string;
   cancelled_at: string | null;
+  notified_at: string | null;
+  cancel_notified_at: string | null;
 }
 
 export interface TableRow {
@@ -151,4 +153,32 @@ export async function cancelReservation(
       .bind(id, id),
   ]);
   return update.meta.changes === 1;
+}
+
+export async function tableLabel(db: D1Database, tableId: number): Promise<string> {
+  const row = await db
+    .prepare("SELECT label FROM tables WHERE id = ?")
+    .bind(tableId)
+    .first<{ label: string }>();
+  return row?.label ?? `#${tableId}`;
+}
+
+/** When Telegram accepted the "new booking" notification, or null (ADR-018). */
+export async function notifiedAt(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT notified_at FROM reservations WHERE id = ?")
+    .bind(id)
+    .first<{ notified_at: string | null }>();
+  return row?.notified_at ?? null;
+}
+
+/** Records that Telegram accepted the owner notification (ADR-018). */
+export async function markNotified(
+  db: D1Database,
+  id: string,
+  kind: "created" | "cancelled",
+  at: string,
+): Promise<void> {
+  const column = kind === "created" ? "notified_at" : "cancel_notified_at";
+  await db.prepare(`UPDATE reservations SET ${column} = ? WHERE id = ?`).bind(at, id).run();
 }

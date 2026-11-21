@@ -19,6 +19,8 @@ used as classes such as `bg-milk`, `text-espresso`, `bg-cobalt`.
 | `--color-linden` | `#D4DE6A` | Accent only (see rules below) |
 | `--color-steam` | `#6F746B` | Secondary text (notes, captions) |
 | `--color-line` | `#DCDDD4` | Hairlines between menu / hours rows |
+| `--color-error-on-dark` | `#FFB4A6` | (v3) Error text and invalid-field border on espresso |
+| `--color-error` | `#B3261E` | (v3) Error text and destructive action on milk |
 
 Rules:
 - **Linden is never text on a light background** (too low contrast). It is used as:
@@ -103,9 +105,26 @@ Checked widths in step 6.1: 375, 768, 1280.
 - **Menu category heading:** Unbounded 400 20px with a 4px linden underline.
 - **Hours row:** same as a menu row (days left, time right).
 - **Map:** full column width, 360px tall (280px on mobile), no radius, OSM attribution visible.
-- **Booking "coming soon":** espresso background section, milk text,
-  heading in Unbounded 700 with the linden colour — repeats the hero contrast at the
-  end of the page. No button (nothing to book yet).
+- **Booking section (v3, variant A approved in v3 step 3.1):** espresso background, milk text,
+  heading in Unbounded 700 linden — repeats the hero contrast at the end of the page.
+  Two columns from `md` (steps 1–2 left: date, guests, times; step 3 right: details,
+  Turnstile, submit), one column on mobile. Step titles Unbounded 400 20px with a bold number.
+  - **Fields:** milk background, espresso text, 48px tall, radius 10px; label Golos 500 15px
+    above; hint 15px in milk at 70%; invalid field gets a 2px `error-on-dark` border and the
+    message below in `error-on-dark`.
+  - **Chips (guests, times):** 44px tall, radius 10px, 2px border in milk at 35%; selected =
+    linden background with espresso text (same idea as the language pill). Times: 4 per row on
+    mobile, 6 from `sm`. Loading = 8 placeholder blocks; no times = dashed box with a hint.
+  - **Submit:** primary button; its label repeats the choice ("Book a table for Sat, Dec 5,
+    19:00"); "Booking…" while sending.
+  - **General error:** box with a 4px `error-on-dark` left border above the fields, focused
+    and announced.
+  - **Confirmation:** replaces the form; 4px linden left border, Unbounded heading in linden,
+    details list, the private link with a "Copy link" outline button, "Book another table".
+- **Reservation page (v3):** milk page with a minimal header (brand + language switcher) and
+  the footer; status pill (linden = waiting, line grey = cancelled / started); details list;
+  "Cancel booking" as an outline button in `error`, then an inline confirm with a solid
+  `error` button.
 
 ## 7. Section order
 
@@ -114,7 +133,7 @@ Checked widths in step 6.1: 375, 768, 1280.
 3. Menu
 4. Hours
 5. Location (address + map)
-6. Booking — coming soon
+6. Booking — form (v3; "coming soon" in v1)
 7. Footer (demo note, photo credit, repo link)
 
 ## 8. Motion
@@ -139,4 +158,6 @@ switcher and "Book a table" are reachable from anywhere on the page.
 1. Fonts self-hosted via `@fontsource-variable/*` instead of Google Fonts (§2).
 2. Breakpoints `md` 768 / `lg` 1024 instead of the mockup's 820 (§5).
 3. Photo credit line in the footer although the licence does not require it (§3).
-4. Booking teaser on an espresso background without a button (§6).
+4. Booking teaser on an espresso background without a button (§6) — replaced in v3 by the
+   booking form on the same background (variant A, user approval in v3 step 3.1).
+5. (v3) Error colour tokens `error-on-dark` / `error` (§1).

@@ -6,6 +6,15 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n', '@nuxtjs/leaflet'],
   css: ['~/assets/css/main.css'],
+  // Baked into the static build (v3 plan, P7). Override with NUXT_PUBLIC_API_BASE and
+  // NUXT_PUBLIC_TURNSTILE_SITE_KEY (local values in apps/web/.env.local, plan R1).
+  runtimeConfig: {
+    public: {
+      apiBase: 'https://booking-demo-api.nick-burdo.workers.dev',
+      // Public Turnstile site key (not a secret; docs/setup-integrations.md).
+      turnstileSiteKey: '0x4AAAAAAGL8b1GVwSQwY16N',
+    },
+  },
   // Global head: applies to every page, including the 404 error page (plan revision R7.6).
   app: {
     head: {

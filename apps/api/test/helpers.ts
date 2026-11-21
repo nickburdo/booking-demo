@@ -5,6 +5,7 @@ import { clock } from "../src/clock";
 /** Wednesday 2026-12-02, 10:10 Kyiv time. Tests book on the following days. */
 export const NOW = new Date("2026-12-02T08:10:00Z");
 export const THURSDAY = "2026-12-03";
+export const TEST_TURNSTILE_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
 export function pinClock(now: Date = NOW): void {
   vi.spyOn(clock, "now").mockReturnValue(now);
@@ -52,6 +53,8 @@ export function booking(overrides: Record<string, unknown> = {}) {
     guests: 4,
     name: "Olena",
     phone: "067 123 45 67",
+    // Turnstile test token; siteverify is mocked in test/outbound.ts.
+    turnstileToken: TEST_TURNSTILE_TOKEN,
     ...overrides,
   };
 }
@@ -63,5 +66,25 @@ export async function tableOf(reservationId: string): Promise<{ id: number; seat
     .bind(reservationId)
     .first<{ id: number; seats: number }>();
   if (!row) throw new Error(`reservation ${reservationId} not found`);
+  return row;
+}
+
+/** Polls until fn returns a truthy value (background work after a response). */
+export async function waitFor<T>(fn: () => Promise<T>, timeoutMs = 2000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await fn();
+    if (value || Date.now() > deadline) return value;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
+export async function notificationColumns(
+  id: string,
+): Promise<{ notified_at: string | null; cancel_notified_at: string | null }> {
+  const row = await env.DB.prepare("SELECT notified_at, cancel_notified_at FROM reservations WHERE id = ?")
+    .bind(id)
+    .first<{ notified_at: string | null; cancel_notified_at: string | null }>();
+  if (!row) throw new Error(`reservation ${id} not found`);
   return row;
 }

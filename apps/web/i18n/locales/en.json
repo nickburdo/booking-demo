@@ -39,11 +39,92 @@
   },
   "booking": {
     "title": "Table booking",
-    "text": "Online booking is coming soon. Until then, just drop in."
+    "lead": "Pick a day and how many of you are coming — we'll show the free times. A table is held for 90 minutes.",
+    "step1": "Day and guests",
+    "step2": "Time",
+    "step3": "Your details",
+    "date": "Date",
+    "guests": "Guests",
+    "loadingTimes": "Loading free times…",
+    "noTimes": "No free tables for {guests} on this day. Try another date or fewer guests.",
+    "timesError": "Couldn't load free times.",
+    "retry": "Try again",
+    "onlyFree": "Only free times are shown.",
+    "selected": "{start}–{end} selected.",
+    "name": "Name",
+    "phone": "Phone",
+    "phoneHint": "We'll call only if something changes.",
+    "comment": "Comment",
+    "optional": "(optional)",
+    "submit": "Book a table",
+    "submitFor": "Book a table for {date}, {time}",
+    "submitting": "Booking…",
+    "check": "Bot check",
+    "fieldErrors": {
+      "name": "Please enter your name.",
+      "phone": "Enter a number like +380 67 123 45 67 or 067 123 45 67.",
+      "comment": "The comment is too long (500 characters at most).",
+      "time": "Pick a time first.",
+      "date": "Pick a date within the next 30 days.",
+      "guests": "Choose from 1 to 4 guests.",
+      "turnstile": "Please complete the check above the button."
+    },
+    "errors": {
+      "SLOT_TAKEN": "Sorry, someone has just taken {time}. Free times are updated — please pick another.",
+      "TIME_NOT_BOOKABLE": "This time can no longer be booked. Free times are updated — please pick another.",
+      "VERIFICATION_FAILED": "The bot check expired or failed. Please complete it again.",
+      "VERIFICATION_UNAVAILABLE": "The bot check is unavailable right now. Please try again in a minute.",
+      "RATE_LIMITED": "Too many attempts. Please wait a minute and try again.",
+      "NETWORK": "No connection to the booking service. Check your internet and try again.",
+      "DATE_OUT_OF_RANGE": "This date is no longer available. Pick another date.",
+      "turnstileLoad": "The bot check could not load. Disable content blockers for this site or try later.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "success": {
+      "title": "You're booked!",
+      "when": "When",
+      "guests": "Guests",
+      "name": "Name",
+      "linkIntro": "Save this private link — it's the only way to see or cancel your booking:",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "note": "The coffee shop has been notified. This is a demo — no real table is waiting for you.",
+      "another": "Book another table"
+    }
   },
   "footer": {
     "demo": "This is a demo project: the coffee shop is fictional.",
     "photoCredit": "Photo: {author} / Unsplash",
     "repo": "Source code on GitHub"
+  },
+  "reservation": {
+    "metaTitle": "Your booking — Linden Coffee",
+    "title": "Your booking",
+    "loading": "Loading your booking…",
+    "notFound": "Booking not found",
+    "notFoundText": "This link is incomplete or the booking doesn't exist. Check that you copied the whole link.",
+    "status": {
+      "pending": "Waiting for confirmation",
+      "cancelled": "Cancelled",
+      "started": "Started"
+    },
+    "when": "When",
+    "guests": "Guests",
+    "name": "Name",
+    "comment": "Comment",
+    "cancel": "Cancel booking",
+    "cancelHint": "Can't make it? Cancelling frees the table for others.",
+    "confirmQuestion": "Cancel this booking?",
+    "confirmYes": "Yes, cancel",
+    "confirmNo": "Keep it",
+    "cancelling": "Cancelling…",
+    "cancelledNote": "Your booking is cancelled. The coffee shop has been notified.",
+    "startedNote": "This booking has already started, so it can't be cancelled online.",
+    "back": "Back to Linden Coffee",
+    "errors": {
+      "NOT_CANCELLABLE": "This booking can no longer be cancelled.",
+      "NETWORK": "No connection to the booking service. Check your internet and try again.",
+      "generic": "Something went wrong. Please try again."
+    }
   }
 }

@@ -10,12 +10,15 @@ The coffee shop is invented; the booking mechanics are the real subject.
 
 ## Status
 
-v1 is live: a one-page landing with menu, opening hours, map and a "booking coming soon"
-section, in English, Russian and Ukrainian.
+v1 is live: a one-page landing with menu, opening hours, map and a booking section, in
+English, Russian and Ukrainian.
 
 v2 is live: the booking API — availability, create, view and cancel reservations, with
 double booking prevented by the database itself (see [How double booking is prevented](docs/api.md#how-double-booking-is-prevented)).
-The booking form on the site arrives in v3.
+
+v3 is live: the booking form on the site (date and guests → free times → contacts), a
+private reservation page to view or cancel a booking, Telegram messages to the owner about
+new and cancelled bookings, and a Cloudflare Turnstile bot check on booking.
 
 ## Roadmap
 
@@ -23,7 +26,7 @@ The booking form on the site arrives in v3.
 |---|---|---|
 | v1 | Landing: menu, hours, map, EN/RU/UK, responsive, deployed | ✅ Done |
 | v2 | API + database: tables, slots, reservations, double-booking protection | ✅ Done |
-| v3 | Booking form + Telegram notification to the owner | Planned |
+| v3 | Booking form + Telegram notification to the owner | ✅ Done |
 | v4 | Admin: list reservations, confirm/cancel | Planned |
 | v5 | Scripted chat (no AI) on the same API | Planned |
 | v6 | AI chat calling the same API via tool calls | Planned |
@@ -39,6 +42,7 @@ The booking form on the site arrives in v3.
 - **Hosting:** Cloudflare Workers static assets (`*.workers.dev`), deployed with Wrangler
 - **API:** Express 5 on Cloudflare Workers (`nodejs_compat`), Cloudflare D1 (SQLite) with raw SQL
   and migrations, zod validation, Workers Rate Limiting
+- **Notifications and bot check:** Telegram Bot API, Cloudflare Turnstile
 - **Tests (API):** Vitest with `@cloudflare/vitest-plugin`, running inside `workerd` on a local D1
 - **Repo:** pnpm workspaces monorepo (`apps/web`, `apps/api`)
 
@@ -46,13 +50,14 @@ The booking form on the site arrives in v3.
 
 ```
 apps/
-  web/        Nuxt landing (v1)
-  api/        Express booking API on Workers + D1 (v2)
+  web/        Nuxt site: landing (v1), booking form and reservation page (v3)
+  api/        Express booking API on Workers + D1 (v2), Telegram + Turnstile (v3)
 docs/
   overview.md       goals and roadmap
   api.md            booking API contract and examples
   architecture.md   components and what exists now
   decisions.md      architecture decision records
+  setup-integrations.md  one-time Telegram bot and Turnstile setup
   design.md         visual design: palette, type, layout
   cafe.md           the fictional coffee shop's content
   plans/            one implementation plan per version
@@ -62,9 +67,20 @@ docs/
 
 Requirements: Node.js 24, pnpm.
 
+Local config (git-ignored files; the templates next to them are committed):
+
+```sh
+cp apps/web/.env.example apps/web/.env.local     # site → local API, Turnstile test key
+cp apps/api/.dev.vars.example apps/api/.dev.vars  # API → Turnstile test secret
+```
+
+They use Cloudflare's Turnstile test keys, so the bot check always passes locally.
+Telegram messages from the local API are optional: see section 5 of
+[docs/setup-integrations.md](docs/setup-integrations.md).
+
 ```sh
 pnpm install
-pnpm dev          # http://localhost:3000
+pnpm dev          # http://localhost:3000 (reads apps/web/.env.local)
 ```
 
 Booking API (local D1 in `.wrangler/`):
@@ -77,22 +93,25 @@ pnpm dev:api      # http://localhost:8787
 pnpm test:api     # Vitest suite
 ```
 
-Race demo — concurrent bookings of one slot (cancels what it creates):
+Race demo — concurrent bookings of one slot (cancels what it creates). Local API only:
+since v3 the live API requires a real Turnstile token.
 
 ```sh
-node apps/api/scripts/race.mjs                                    # local API
-node apps/api/scripts/race.mjs --base https://booking-demo-api.nick-burdo.workers.dev
+node apps/api/scripts/race.mjs
 ```
 
 Build the static site:
 
 ```sh
-pnpm generate     # output: apps/web/.output/public
+pnpm generate                          # live config, output: apps/web/.output/public
+pnpm --filter web generate:local       # same, with the local values from .env.local
 ```
 
 ## Deploy
 
 Requires a Cloudflare account and `wrangler login` (run once, from `apps/web`).
+Before the first v3 deploy, create the Telegram bot and the Turnstile widget and store the
+three API secrets: [docs/setup-integrations.md](docs/setup-integrations.md).
 
 ```sh
 pnpm deploy       # web: nuxt generate + wrangler deploy
