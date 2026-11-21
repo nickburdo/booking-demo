@@ -1,6 +1,6 @@
 # v3 plan — Booking form and Telegram notifications
 
-- **Status:** Approved (2026-11-21) — in progress
+- **Status:** Done (2026-11-21) — live; revisions R1–R4
 - **Scope:** stage v3 of the roadmap (`docs/overview.md`): a booking form on the landing page
   (`#booking`) that uses the v2 API; a guest reservation page (view + cancel by private link);
   Telegram notifications to the owner on new and cancelled reservations; Cloudflare Turnstile

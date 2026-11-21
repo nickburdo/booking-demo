@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1 and v2 implemented, v3 planned** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1, v2 and v3 implemented** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -35,6 +35,7 @@ booking-demo/
 │   ├── architecture.md
 │   ├── api.md      booking API contract (v2)
 │   ├── decisions.md
+│   ├── setup-integrations.md  Telegram bot + Turnstile setup (v3)
 │   ├── cafe.md     fictional coffee shop content (source of truth)
 │   ├── design.md   visual design (v1)
 │   └── plans/      one plan per version
@@ -131,23 +132,43 @@ Learned in v2:
   previous release (here `wrangler@4.165.0`, `@cloudflare/vitest-plugin@1.8.5`) instead of
   adding exclusions.
 
-## Booking form, notifications, bot check (v3) — planned
+## Booking form, notifications, bot check (v3) — implemented
 
-Plan: `docs/plans/v3-plan.md`. Decisions: ADR-017 … ADR-019.
+Plan: `docs/plans/v3-plan.md`. Decisions: ADR-017 … ADR-019. One-time setup of the bot and
+Turnstile: `docs/setup-integrations.md`.
 
 Web (`apps/web`):
 - `BookingSection.vue` hosts `BookingForm.vue`: date + guests → free times → contacts →
   Turnstile → `POST /reservations` → confirmation with the personal link.
-- `pages/reservation.vue`: reads the token from the URL hash in the browser, shows the
-  reservation, offers cancellation; `noindex`.
-- `TurnstileWidget.vue` (client-only, explicit render) and `composables/useBookingApi.ts`.
-- Config baked in at `nuxt generate`: `NUXT_PUBLIC_API_BASE`, `NUXT_PUBLIC_TURNSTILE_SITE_KEY`
-  (local values in git-ignored `apps/web/.env`).
+- `pages/reservation.vue`: reads the token from the URL hash in the browser (after hydration,
+  see "Learned"), shows the reservation, offers cancellation; `noindex`.
+- `TurnstileWidget.client.vue` (explicit render), `composables/useBookingApi.ts`,
+  `composables/useKyivDate.ts`.
+- Config baked in at `nuxt generate`: `runtimeConfig.public.apiBase` and `turnstileSiteKey`
+  in `nuxt.config.ts` hold the live values; `pnpm dev` and `pnpm --filter web generate:local`
+  override them from git-ignored `apps/web/.env.local` (local API, Turnstile test key).
 
 API (`apps/api`):
 - `src/turnstile.ts`: `siteverify` check after body validation; fail closed.
-- `src/telegram.ts`: Ukrainian message builder (HTML-escaped) and `sendMessage` call; run via
-  `waitUntil` from `cloudflare:workers` after create and cancel; success stamps
-  `notified_at` / `cancel_notified_at` (migration `0003`).
+- `src/telegram.ts`: Ukrainian message builder (HTML-escaped) and `sendMessage` call.
+- `src/notify.ts`: runs the notification via `waitUntil` from `cloudflare:workers` after
+  create and cancel; success stamps `notified_at` / `cancel_notified_at` (migration `0003`);
+  the cancel message waits for the "new booking" one (up to 10 s, ADR-018).
 - Secrets (`wrangler secret put`): `TURNSTILE_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
-  local values in git-ignored `apps/api/.dev.vars` (Turnstile test secret).
+  local values in git-ignored `apps/api/.dev.vars` (Turnstile test secret, optional Telegram).
+
+Learned in v3:
+- A prerendered Nuxt 4 page that is opened with a different URL (here `/reservation#token`)
+  first hydrates with the prerendered route and restores the real one on
+  `app:suspense:resolve` ("deferred route"). Code in `onMounted` still sees the URL without
+  the hash. Read such values in `onNuxtReady` from `useRoute()`. Dev mode has no prerender,
+  so test this kind of page on a built site (`generate:local`).
+- `nuxt generate` reads `.env` like `nuxt dev` does, so local values in `.env` end up in the
+  production build. Local values now live in `.env.local`, loaded only by explicit scripts.
+- Turnstile: with a script injected at runtime, wait for its `onload`; `turnstile.ready()`
+  throws for async scripts. The production secret rejects Cloudflare's dummy test token, so
+  scripts (e.g. `race.mjs`) can only create bookings on a local API.
+- `waitUntil` works with Express on Workers and in the Vitest integration; spying on
+  `globalThis.fetch` in a test intercepts the Worker's outbound calls (same isolate).
+- Two background tasks of one booking are unordered; Date.now() does not advance during I/O
+  in Workers, so the wait for the first message counts attempts instead of reading the clock.
