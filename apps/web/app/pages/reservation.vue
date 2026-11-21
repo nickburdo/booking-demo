@@ -37,9 +37,14 @@ async function load() {
   }
 }
 
-onMounted(() => {
+// The page is prerendered for /reservation. While hydrating a URL that differs from it (here: the
+// #token), Nuxt 4 shows the prerendered route first and restores the real one on
+// app:suspense:resolve ("deferred route", plan revision R3). onNuxtReady runs after that, so the
+// route hash holds the token by then; window.location.hash in onMounted can still be empty.
+const route = useRoute()
+onNuxtReady(() => {
   hydrated.value = true
-  token = decodeURIComponent(window.location.hash.slice(1))
+  token = decodeURIComponent(route.hash.slice(1))
   if (token) load()
   else state.value = 'notFound'
 })

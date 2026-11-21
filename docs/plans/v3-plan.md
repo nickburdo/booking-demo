@@ -205,6 +205,7 @@ Telegram message (create; cancel uses "❌ Скасовано бронюванн
   focus visible; error states by forcing each code (validation, slot taken, verification failed,
   API down).
 ### 4.3 Reservation page: open link in a new tab, cancel, reload, wrong token, other language.
+  With a **real token on the built site** (added in R3: the prerendered page behaves differently from dev).
 ### 4.4 Telegram: real messages for create and cancel arrive with correct Ukrainian text.
 - **Done when:** all pass; issues fixed within scope or raised.
 
@@ -254,3 +255,21 @@ server for it.
 links to it instead of repeating the steps.
 
 **Done when:** the file exists and is linked from this plan (now) and the README (6.2).
+
+## Revision R3 (2026-11-21) — reservation page lost the token on the live site (approved)
+
+**Trigger:** in 5.4 the link from the confirmation opened `/reservation#<token>` with
+"Booking not found" and no API request. Cause: the page is prerendered for `/reservation`;
+when hydrating a different URL, Nuxt 4.6 first shows the prerendered route and restores the real
+one on `app:suspense:resolve` ("deferred route", `nuxt/dist/pages/runtime/plugins/router.js`).
+`onMounted` ran in between and read an empty `window.location.hash`. Dev mode has no prerender,
+and Phase 4 tested only wrong/empty tokens on the built site, so this was missed.
+
+**Decision (user):**
+- `reservation.vue` reads the token in `onNuxtReady` from `useRoute().hash`.
+- Re-test on the built site (`generate:local`): book → open link → view → cancel → switch
+  language; wrong and empty token. Phase 4.3 now names the real-token check explicitly.
+- Redeploy web (repeat 5.3), then 5.4.
+
+**Done when:** the live link opens the booking and cancel works.
+
