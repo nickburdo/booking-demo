@@ -33,7 +33,7 @@ function choices(options: Option[]): Input {
   return { kind: "choices", options };
 }
 
-function text(ctx: ChatContext, field: TextField, options: Option[], optional = false): Input {
+function text(ctx: ChatContext, field: Exclude<TextField, "message">, options: Option[], optional = false): Input {
   const maxLength = field === "name" ? MAX_NAME : field === "phone" ? 40 : MAX_TEXT;
   return { kind: "text", field, placeholder: t(ctx).placeholder[field], maxLength, optional, options };
 }

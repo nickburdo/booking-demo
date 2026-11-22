@@ -1,6 +1,11 @@
 // D1 access for chat conversations (v5, ADR-024). Multi-statement writes go through batch().
 
-import type { ChatState, Locale, Outcome, TextField } from "./types";
+import type { Locale, Outcome, TextField } from "./types";
+
+/** "scripted" (v5) or "ai" (v6, ADR-026). */
+export type ChatEngine = "scripted" | "ai";
+/** Engine state stored as JSON: the scripted ChatState or the AI state. */
+type StoredState = object;
 
 export const CHAT_IDLE_MS = 2 * 3600_000; // a conversation expires after 2 h of silence
 export const CHAT_RETENTION_DAYS = 7;
@@ -11,6 +16,7 @@ export interface ChatSessionRow {
   locale: Locale;
   state: string; // JSON ChatState
   outcome: Outcome;
+  engine: ChatEngine;
   reservation_id: string | null;
   guest_messages: number;
   message_count: number;
@@ -36,7 +42,7 @@ function insertMessages(db: D1Database, sessionId: string, startSeq: number, mes
 /** Starts a conversation; also deletes conversations older than the retention period. */
 export async function createSession(
   db: D1Database,
-  s: { id: string; tokenHash: string; locale: Locale; state: ChatState; messages: NewMessage[]; now: Date },
+  s: { id: string; tokenHash: string; locale: Locale; engine: ChatEngine; state: StoredState; messages: NewMessage[]; now: Date },
 ): Promise<void> {
   const at = s.now.toISOString();
   const cutoff = new Date(s.now.getTime() - CHAT_RETENTION_DAYS * 86_400_000).toISOString();
@@ -45,10 +51,10 @@ export async function createSession(
     db.prepare("DELETE FROM chat_sessions WHERE created_at < ?").bind(cutoff),
     db
       .prepare(
-        `INSERT INTO chat_sessions (id, token_hash, locale, state, message_count, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO chat_sessions (id, token_hash, locale, engine, state, message_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(s.id, s.tokenHash, s.locale, JSON.stringify(s.state), s.messages.length, at, at),
+      .bind(s.id, s.tokenHash, s.locale, s.engine, JSON.stringify(s.state), s.messages.length, at, at),
     ...insertMessages(db, s.id, 0, s.messages, at),
   ]);
 }
@@ -67,7 +73,7 @@ export async function findLiveSession(db: D1Database, tokenHash: string, now: Da
  * same write stores the state with its "busy" mark. A second request either loses the version
  * race or reads the mark, so an action such as a booking cannot run twice.
  */
-export async function claimStep(db: D1Database, id: string, version: number, busyState: ChatState): Promise<boolean> {
+export async function claimStep(db: D1Database, id: string, version: number, busyState: StoredState): Promise<boolean> {
   const result = await db
     .prepare("UPDATE chat_sessions SET version = version + 1, state = ? WHERE id = ? AND version = ?")
     .bind(JSON.stringify(busyState), id, version)
@@ -76,7 +82,7 @@ export async function claimStep(db: D1Database, id: string, version: number, bus
 }
 
 /** Puts back the state without the busy mark after a failed step (best effort). */
-export async function releaseStep(db: D1Database, id: string, state: ChatState): Promise<void> {
+export async function releaseStep(db: D1Database, id: string, state: StoredState): Promise<void> {
   await db.prepare("UPDATE chat_sessions SET state = ? WHERE id = ?").bind(JSON.stringify(state), id).run();
 }
 
@@ -84,7 +90,7 @@ export async function releaseStep(db: D1Database, id: string, state: ChatState):
 export async function saveTurn(
   db: D1Database,
   row: ChatSessionRow,
-  t: { state: ChatState; outcome: Outcome; reservationId: string | null; messages: NewMessage[]; now: Date },
+  t: { state: StoredState; outcome: Outcome; reservationId: string | null; messages: NewMessage[]; now: Date },
 ): Promise<void> {
   const at = t.now.toISOString();
   await db.batch([
@@ -116,29 +122,29 @@ export async function listMessages(db: D1Database, sessionId: string): Promise<C
   return results;
 }
 
-export type ChatListRow = Pick<ChatSessionRow, "id" | "locale" | "outcome" | "message_count" | "created_at"> & {
+export type ChatListRow = Pick<ChatSessionRow, "id" | "locale" | "engine" | "outcome" | "message_count" | "created_at"> & {
   reservation_date: string | null;
 };
 
 /** Conversations started since `since`, newest first, with the date of the booking made in them. */
-export async function listChats(db: D1Database, since: string): Promise<ChatListRow[]> {
+export async function listChats(db: D1Database, since: string, engine?: ChatEngine): Promise<ChatListRow[]> {
   const { results } = await db
     .prepare(
-      `SELECT c.id, c.locale, c.outcome, c.message_count, c.created_at, r.date AS reservation_date
+      `SELECT c.id, c.locale, c.engine, c.outcome, c.message_count, c.created_at, r.date AS reservation_date
        FROM chat_sessions c LEFT JOIN reservations r ON r.id = c.reservation_id
-       WHERE c.created_at >= ? ORDER BY c.created_at DESC LIMIT 200`,
+       WHERE c.created_at >= ? AND (? IS NULL OR c.engine = ?) ORDER BY c.created_at DESC LIMIT 200`,
     )
-    .bind(since)
+    .bind(since, engine ?? null, engine ?? null)
     .all<ChatListRow>();
   return results;
 }
 
-export async function findChat(db: D1Database, id: string): Promise<ChatListRow | null> {
+export async function findChat(db: D1Database, id: string): Promise<(ChatListRow & { state: string }) | null> {
   return db
     .prepare(
-      `SELECT c.id, c.locale, c.outcome, c.message_count, c.created_at, r.date AS reservation_date
+      `SELECT c.id, c.locale, c.engine, c.outcome, c.message_count, c.created_at, c.state, r.date AS reservation_date
        FROM chat_sessions c LEFT JOIN reservations r ON r.id = c.reservation_id WHERE c.id = ?`,
     )
     .bind(id)
-    .first<ChatListRow>();
+    .first<ChatListRow & { state: string }>();
 }
