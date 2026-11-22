@@ -155,12 +155,13 @@ async function transition(
   from: readonly ReservationStatus[],
   to: ReservationStatus,
   set: Record<string, string | null>,
+  guard = "",
 ): Promise<boolean> {
   const columns = Object.keys(set);
   const assignments = ["status = ?", ...columns.map((c) => `${c} = ?`)].join(", ");
   const fromList = from.map(() => "?").join(", ");
   const update = db
-    .prepare(`UPDATE reservations SET ${assignments} WHERE id = ? AND status IN (${fromList})`)
+    .prepare(`UPDATE reservations SET ${assignments} WHERE id = ? AND status IN (${fromList})${guard}`)
     .bind(to, ...columns.map((c) => set[c]), id, ...from);
   const statements = [update];
   if (to === "cancelled" || to === "no_show") {
@@ -185,11 +186,17 @@ export function cancelReservation(
   by: "guest" | "owner",
   reason: string | null = null,
 ): Promise<boolean> {
-  return transition(db, id, ACTIVE_STATUSES, "cancelled", {
-    cancelled_at: at,
-    cancelled_by: by,
-    cancel_reason: reason,
-  });
+  // v7 (ADR-029): the café cannot cancel a paid booking. The check is part of the same UPDATE, so a
+  // payment recorded between the admin's read and this write still wins.
+  const guard = by === "owner" ? " AND NOT EXISTS (SELECT 1 FROM orders WHERE reservation_id = reservations.id AND status = 'paid')" : "";
+  return transition(
+    db,
+    id,
+    ACTIVE_STATUSES,
+    "cancelled",
+    { cancelled_at: at, cancelled_by: by, cancel_reason: reason },
+    guard,
+  );
 }
 
 export function confirmReservation(db: D1Database, id: string, at: string): Promise<boolean> {

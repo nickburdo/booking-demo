@@ -89,7 +89,8 @@
       "copy": "Copy link",
       "copied": "Copied",
       "note": "The coffee shop has been notified. This is a demo: no real table is waiting for you, and a real café would also send you an SMS or a messenger message when it confirms or cancels. Here, open your link to see the current status.",
-      "another": "Book another table"
+      "another": "Book another table",
+      "preorder": "After the café confirms, you can pre-order dishes on your booking page and pay online with 20% off."
     }
   },
   "footer": {
@@ -194,7 +195,8 @@
       "generic": "Something went wrong. Please try again.",
       "NOT_ALLOWED": "This action is no longer possible. The list now shows the current state.",
       "NETWORK": "No connection to the booking service. Try again.",
-      "load": "Could not load the reservations."
+      "load": "Could not load the reservations.",
+      "PAID_BOOKING": "The guest has paid a pre-order, so the café can’t cancel this booking."
     },
     "day": {
       "metaTitle": "Reservations — Linden Coffee admin",
@@ -255,6 +257,16 @@
         "scripted": "Scripted",
         "ai": "AI"
       }
+    },
+    "order": {
+      "tag": {
+        "paid": "Paid",
+        "refunded": "Refunded",
+        "refund_failed": "Refund failed"
+      },
+      "line": "Pre-order: {dishes} · {amount}",
+      "cantCancel": "Paid bookings can’t be cancelled by the café",
+      "noShowKeeps": "a no-show keeps the payment"
     }
   },
   "chat": {
@@ -292,5 +304,41 @@
       "demoNote": "Demo: replies come from an open AI model on Cloudflare and can be wrong. Nothing happens until you press a confirm button. Conversations are visible in the public demo admin: phones are hidden, so please share no personal details beyond the name and phone a booking needs. The free AI limit is shared by all visitors each day."
     },
     "start": "Start chat"
+  },
+  "preorder": {
+    "title": "Pre-order · 20% off",
+    "lead": "Choose dishes now and pay online — they will be ready when you arrive.",
+    "fewer": "Fewer: {name}",
+    "more": "More: {name}",
+    "total": "Total",
+    "withDiscount": "With 20% off",
+    "inEuros": "You pay in euros (demo rate 1 € = {rate} ₴)",
+    "pay": "Pay {amount}",
+    "payEmpty": "Pay",
+    "paying": "Going to payment…",
+    "payHint": "You will go to Stripe’s secure page and come back here.",
+    "empty": "Add at least one dish to pay.",
+    "demo": "Demo: Stripe test mode, no real money. Pay with the test card {card}, any future date, any CVC.",
+    "checking": "Checking the payment…",
+    "checkingHint": "This takes a few seconds. You can stay on this page.",
+    "checkingSlow": "The payment is still being checked. Reload this page in a minute.",
+    "notCompleted": "The payment was not completed. You can choose dishes and pay again.",
+    "paidTitle": "Pre-order paid ✓",
+    "paidWith": "Paid with 20% off",
+    "paidNote": "A paid pre-order can’t be changed. If you cancel the booking, the money is returned in full.",
+    "cancelRefund": "Cancel booking and get a refund",
+    "cancelRefundHint": "The money for the pre-order is returned to your card in full.",
+    "refundedTitle": "Refunded",
+    "refundedText": "{amount} are returned to your card. In test mode this is instant; a real bank takes a few days.",
+    "refundFailedTitle": "The refund is being processed",
+    "refundFailedText": "The booking is cancelled. The café has been told and will return the money.",
+    "reminder": "When the café confirms the booking, you can pre-order dishes here and pay online with 20% off.",
+    "errors": {
+      "ORDER_NOT_ALLOWED": "Pre-ordering is no longer possible for this booking. Reload the page.",
+      "PAYMENTS_UNAVAILABLE": "Payments are unavailable right now. Please try again later.",
+      "RATE_LIMITED": "Too many attempts. Try again in a minute.",
+      "NETWORK": "No connection to the booking service. Check your internet and try again.",
+      "generic": "Something went wrong. Please try again."
+    }
   }
 }

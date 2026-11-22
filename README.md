@@ -41,6 +41,13 @@ address and menu, and passes a question to the café. **The AI only proposes** �
 until the guest presses Confirm on a summary the server writes. AI conversations are shown in the
 admin next to the scripted ones, with a filter.
 
+v7 is live: **pre-order with prepayment**. After the café confirms a booking, the guest can pick
+dishes on the private reservation page and pay online with **20% off**, on **Stripe Checkout in
+test mode** (test card `4242 4242 4242 4242`, no real money). The API takes the prices from the
+menu, learns about the payment from Stripe's signed webhook and from a check when the guest returns,
+and refunds automatically when the guest cancels. A paid booking cannot be cancelled by the café;
+a no-show keeps the payment. The owner gets Telegram messages about payments and refunds.
+
 ## Demo limitations
 
 This is a demo, so some things a real booking service would do are left out on purpose:
@@ -56,6 +63,9 @@ This is a demo, so some things a real booking service would do are left out on p
 | The **AI chat runs on a free daily quota** shared by all visitors; when it is used up, the AI tab says so until 00:00 UTC (the scripted tab keeps working) | A paid plan sized to real traffic |
 | The AI is an **open model and can be wrong** (a demo notice says so); it only proposes, the guest confirms | A stronger model, evaluation on real conversations, and human review |
 | In AI conversations **phones are masked in the admin, but a name written in free text may be shown**; the notice asks for no extra personal data | Only staff see conversations |
+| **Payments are Stripe test mode only**: test cards, no real money; the test account is registered in Germany, so the charge is in **euros at a fixed demo rate** (1 € = 50 ₴) while the menu stays in hryvnias | A payment provider for the café's own country and currency, a live account, fiscal receipts |
+| A pre-order exists **only with payment**, a paid one **cannot be changed**, refunds are always full | Unpaid pre-orders, changes with extra payments or partial refunds, cancellation fees |
+| Stripe's page shows the café's name, but the **browser tab shows the sandbox's name** (it cannot be renamed without verifying a business) | A verified account with its own name and branding |
 
 ## Roadmap
 
@@ -67,7 +77,7 @@ This is a demo, so some things a real booking service would do are left out on p
 | v4 | Admin: list reservations, confirm/cancel | ✅ Done |
 | v5 | Scripted chat (no AI) on the same API | ✅ Done |
 | v6 | AI chat calling the same API via tool calls | ✅ Done |
-| v7 | Prepayment in a payment provider's test mode | Planned |
+| v7 | Prepayment in a payment provider's test mode | ✅ Done |
 
 ## Stack
 
@@ -81,6 +91,7 @@ This is a demo, so some things a real booking service would do are left out on p
   and migrations, zod validation, Workers Rate Limiting
 - **Notifications and bot check:** Telegram Bot API, Cloudflare Turnstile
 - **AI chat:** Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`) with tool calling, through the `AI` binding
+- **Payments:** Stripe Checkout (hosted page) in test mode, the official `stripe` package; signed webhooks
 - **Tests (API):** Vitest with `@cloudflare/vitest-plugin`, running inside `workerd` on a local D1
 - **Repo:** pnpm workspaces monorepo (`apps/web`, `apps/api`)
 

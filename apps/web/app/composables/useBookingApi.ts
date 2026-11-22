@@ -18,6 +18,25 @@ export interface Reservation {
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'no_show'
 
+/** v7: a pre-order (docs/api.md → Order object). Prices in hryvnias, `amount` in euro cents. */
+export interface Order {
+  status: 'checkout' | 'paid' | 'refunded' | 'refund_failed'
+  items: { id: string, name: string, quantity: number, price: number }[]
+  total: number
+  discountPercent: number
+  discounted: number
+  amount: number
+  currency: string
+  rate: number
+  paidAt: string | null
+  refundedAt: string | null
+}
+
+export interface ReservationView {
+  reservation: Reservation
+  order: Order | null
+}
+
 export interface NewReservation {
   date: string
   time: string
@@ -48,6 +67,9 @@ export type ApiErrorCode =
   | 'CHAT_EXPIRED'
   | 'CHAT_CONFLICT'
   | 'CHAT_LIMIT'
+  | 'ORDER_NOT_ALLOWED'
+  | 'PAID_BOOKING'
+  | 'PAYMENTS_UNAVAILABLE'
   | 'NETWORK'
 
 export class ApiError extends Error {
@@ -90,11 +112,15 @@ export function useBookingApi() {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    get: (token: string) =>
-      request<{ reservation: Reservation }>(`/reservations/${encodeURIComponent(token)}`).then((r) => r.reservation),
+    // v7: the reservation comes with its pre-order.
+    get: (token: string) => request<ReservationView>(`/reservations/${encodeURIComponent(token)}`),
     cancel: (token: string) =>
-      request<{ reservation: Reservation }>(`/reservations/${encodeURIComponent(token)}/cancel`, {
+      request<ReservationView>(`/reservations/${encodeURIComponent(token)}/cancel`, { method: 'POST' }),
+    /** v7: starts a pre-order; the answer is the URL of Stripe's payment page. */
+    order: (token: string, items: { itemId: string, quantity: number }[], locale: string) =>
+      request<{ url: string }>(`/reservations/${encodeURIComponent(token)}/order`, {
         method: 'POST',
-      }).then((r) => r.reservation),
+        body: JSON.stringify({ items, locale }),
+      }),
   }
 }

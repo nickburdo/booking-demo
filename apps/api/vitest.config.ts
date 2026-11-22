@@ -21,6 +21,9 @@ export default defineConfig({
             TELEGRAM_BOT_TOKEN: "test-bot-token",
             TELEGRAM_CHAT_ID: "42",
             ADMIN_PASSWORD: "test-admin-password",
+            // v7: Stripe calls are replaced in test/outbound.ts; the webhook secret signs test events.
+            STRIPE_SECRET_KEY: "sk_test_fake",
+            STRIPE_WEBHOOK_SECRET: "whsec_test_secret",
           },
         },
       };

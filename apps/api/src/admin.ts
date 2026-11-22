@@ -4,6 +4,7 @@
 import { createReservation, getAvailability } from "./booking";
 import { HttpError } from "./errors";
 import { maskName, maskPhone } from "./mask";
+import { adminOrders, closeOpenCheckouts, type OrderDto } from "./orders";
 import {
   ACTIVE_STATUSES,
   cancelReservation,
@@ -33,9 +34,11 @@ export interface AdminReservationDto {
   cancelReason: string | null;
   notified: boolean;
   demo: boolean;
+  /** v7: the pre-order if one was paid (also refunded or with a failed refund), else null. */
+  order: OrderDto | null;
 }
 
-export function toAdminDto(row: AdminRow): AdminReservationDto {
+export function toAdminDto(row: AdminRow, order: OrderDto | null = null): AdminReservationDto {
   return {
     id: row.id,
     date: row.date,
@@ -51,11 +54,14 @@ export function toAdminDto(row: AdminRow): AdminReservationDto {
     cancelReason: row.cancel_reason,
     notified: row.notified_at !== null,
     demo: row.is_demo === 1,
+    order,
   };
 }
 
 export async function listDay(db: D1Database, date: string): Promise<AdminReservationDto[]> {
-  return (await listByDate(db, date)).map(toAdminDto);
+  const rows = await listByDate(db, date);
+  const orders = await adminOrders(db, { date });
+  return rows.map((r) => toAdminDto(r, orders.get(r.id) ?? null));
 }
 
 export type AdminAction = "confirm" | "cancel" | "no-show";
@@ -74,6 +80,8 @@ function notAllowed(action: AdminAction, row: AdminRow, started: boolean): HttpE
     : `the reservation is ${row.status}`;
   return new HttpError(409, "NOT_ALLOWED", `Cannot ${action}: ${reason}.`);
 }
+
+const paidBooking = () => new HttpError(409, "PAID_BOOKING", "The guest has paid a pre-order; the café cannot cancel this booking.");
 
 /** Applies an owner action if the rules allow it; returns the updated reservation. */
 export async function applyAction(
@@ -101,9 +109,16 @@ export async function applyAction(
         : await markNoShow(db, id, at);
 
   const updated = (await findAdminRow(db, id))!;
-  // Someone else changed it between our read and our write (ADR-022).
-  if (!changed) throw notAllowed(action, updated, started);
-  return toAdminDto(updated);
+  const order = (await adminOrders(db, { reservationId: id })).get(id) ?? null;
+  if (!changed) {
+    // v7: the cancel was refused because the booking has a paid pre-order (ADR-029).
+    if (action === "cancel" && order?.status === "paid") throw paidBooking();
+    // Someone else changed it between our read and our write (ADR-022).
+    throw notAllowed(action, updated, started);
+  }
+  // A cancelled booking must not stay payable from an open Stripe page (v7 R3.4); best effort.
+  if (action === "cancel") await closeOpenCheckouts(db, id).catch((error) => console.error("Closing checkouts failed:", error));
+  return toAdminDto(updated, order);
 }
 
 // --- Demo reservations (ADR-021) ------------------------------------------------------------

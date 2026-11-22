@@ -113,7 +113,7 @@ async function confirm(ctx: AiContext, state: AiState, proposal: Proposal): Prom
     try {
       const { token, row } = await ctx.services.book(proposal);
       next.history = [...state.history, note(tx.bookingNote(when("en", proposal.date, proposal.time), proposal.guests))];
-      return done(ctx.locale, next, [st.booked, st.bookedLink(reservationLink(ctx, token)), st.bookedDemo], { booked: row, outcome: "booked" });
+      return done(ctx.locale, next, [st.booked, st.bookedLink(reservationLink(ctx, token)), st.preorderHint, st.bookedDemo], { booked: row, outcome: "booked" });
     } catch (error) {
       if (error instanceof HttpError && (error.code === "SLOT_TAKEN" || error.code === "TIME_NOT_BOOKABLE")) {
         next.history = [...state.history, note("(Confirm failed: that time was just taken. Offer other times.)")];

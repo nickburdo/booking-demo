@@ -87,3 +87,35 @@ export async function sendTelegram(config: TelegramConfig, text: string): Promis
     return false;
   }
 }
+
+// --- v7: pre-order payments (ADR-029) --------------------------------------------------------
+
+export type OrderNoticeKind = "paid" | "refunded" | "refund_failed";
+
+const ORDER_HEADERS: Record<OrderNoticeKind, string> = {
+  paid: "💳 Передзамовлення оплачено",
+  refunded: "↩️ Кошти за передзамовлення повернено",
+  refund_failed: "⚠️ Повернення коштів не вдалося — поверніть їх вручну в Stripe",
+};
+
+export interface OrderNoticeData {
+  date: string;
+  time: string;
+  name: string;
+  phone: string;
+  /** Dish names in Ukrainian with quantities. */
+  items: { name: string; quantity: number }[];
+  discountedUah: number;
+  /** Charged amount, already formatted (e.g. "3,44 €"). */
+  charged: string;
+}
+
+export function buildOrderMessage(kind: OrderNoticeKind, d: OrderNoticeData): string {
+  return [
+    ORDER_HEADERS[kind],
+    `${formatDateUk(d.date)} · ${d.time}`,
+    `${escapeHtml(d.name)} · ${escapeHtml(d.phone)}`,
+    d.items.map((i) => `${escapeHtml(i.name)} × ${i.quantity}`).join(", "),
+    `${d.discountedUah} ₴ · ${d.charged}`,
+  ].join("\n");
+}

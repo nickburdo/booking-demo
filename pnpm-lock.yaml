@@ -19,6 +19,9 @@ importers:
       express:
         specifier: 5.3.0
         version: 5.3.0(supports-color@10.2.2)
+      stripe:
+        specifier: ^23.2.0
+        version: 23.2.0(@types/node@26.6.6)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3869,6 +3872,15 @@ packages:
 
   strip-literal@4.0.0:
     resolution: {integrity: sha512-PaqAvfUZKBwc/SLmNZtHmzK+v19Z4O4eS3cKPeGvbIv/U3pnyEq4Tuw3/4v/FwfM8VQaEawsyCcOQ0P+kpwWWw==}
+
+  stripe@23.2.0:
+    resolution: {integrity: sha512-0W0J4yA9qFO2rnF61v8Y62OiO2SmAR+Cv04VJaFUMpCxiq8lG5bxEYbeSMSpMDR9ofFZGd+Z/iUIgSFbOolmUw==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   structured-clone-es@2.0.1:
     resolution: {integrity: sha512-10ZL5r77LhknxlP1FBiCW+VdnuWOEFLdSS2SKtjyEV+L4qP1hUEIMIZW94LC3jKxRmT/Dj7KkD1mqh/IY6lhKQ==}
@@ -8572,6 +8584,10 @@ snapshots:
   strip-literal@4.0.0:
     dependencies:
       js-tokens: 10.0.0
+
+  stripe@23.2.0(@types/node@26.6.6):
+    optionalDependencies:
+      '@types/node': 26.6.6
 
   structured-clone-es@2.0.1: {}
 

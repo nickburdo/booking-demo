@@ -1,6 +1,6 @@
 # v7 plan — Pre-order with prepayment in Stripe test mode
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R3
 - **Scope:** stage v7 of the roadmap (`docs/overview.md`): the bridge from booking to purchase. After
   the café **confirms** a booking, the guest can **pre-order dishes** from the menu on the private
   reservation page and **pay online with a 20% discount**. Payment runs on **Stripe Checkout in test
@@ -142,3 +142,68 @@
 ### 7.2 README (pre-order and test payments, demo limitations: test mode, test cards), `docs/architecture.md`
   (v7 implemented, learned), this plan → Done.
 ### 7.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Revision R1 (2026-11-22) — pay in euros at a fixed demo rate (approved)
+
+**Trigger:** step 1.2. Stripe does not offer Ukraine at sign-up; the user created the test account
+as Germany (`country: DE`, default currency EUR). The user decided not to try UAH (P4) and to
+charge in **euros at a fixed rate**, since it is a demo. Step 1.4 check: a test Checkout Session in
+EUR is created and opens. Stripe's **Adaptive Pricing** then offered the guest a UAH price at its
+own rate (+4%); with `adaptive_pricing[enabled]=false` only the euro amount is shown (checked).
+
+**Decisions (user):**
+- Menu prices stay in hryvnias on the site; the charge is in **EUR** at a fixed demo rate of
+  **1 € = 50 ₴** (one constant in the code, labelled as a demo rate).
+- **Euros only** on Stripe's page: every Checkout Session sets `adaptive_pricing[enabled]=false`.
+
+**Changes to the plan:**
+- P3: each line item's unit price in euro cents = `round(price_uah × 0.8 / 50 × 100)`; the charged
+  amount is the sum of the lines (so Stripe's total and ours always match).
+- P4: replaced by the above (UAH is not used for payments).
+- P5: `orders.amount` is in euro cents, `currency = 'eur'`; `total_uah` (full) and the discounted
+  hryvnia total are kept for display.
+- P12: the pre-order block shows the totals in hryvnias and the charge in euros, e.g. "215 ₴ →
+  172 ₴ with 20% off · you pay 3,44 € (demo rate 1 € = 50 ₴)".
+- Risk R2 closed. Docs: `docs/api.md` (order object), ADR-028 (currency) updated.
+
+**Business name on Stripe's page:** the sandbox's name ("Nick Burdo sandbox", the owner's name)
+cannot be changed without verifying a business (the dashboard locks "Manage sandboxes"). Every
+Checkout Session therefore sets `branding_settings[display_name]=Linden Coffee`, so the page shows
+the café's name (checked). Only the browser tab title keeps the sandbox name; accepted by the user.
+
+## Revision R2 (2026-11-22) — card payments only (approved)
+
+**Trigger:** the Phase 4 check on Stripe's page. Besides cards, Stripe offered MB WAY, Bancontact,
+Satispay and EPS (the account's dynamic payment methods). Some methods confirm the payment later,
+with a separate event (`checkout.session.async_payment_succeeded`), which the API does not handle:
+such an order would stay unpaid.
+
+**Decision (user):** every Checkout Session accepts cards only. Implemented with
+`allowed_payment_method_types: ["card"]`: from Stripe API version `2026-09-30` the older
+`payment_method_types` cannot be passed (Stripe docs, "Restrict payment methods in code"). The demo stays
+on the clear path card → paid → refund. Docs: `docs/api.md` (pre-order), ADR-028.
+
+## Revision R3 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** the Phase 7.1 review of `main...feature/v7-prepayment` found 8 issues, all confirmed
+against the code. Decisions (user): accept a payment that was started before the booking began;
+fix 1–5, 7, 8; leave 6.
+
+- **R3.1 Late payment refunded.** A payment is judged by the reservation's state, not by the time
+  the news arrives: it counts while the booking is active (pending / confirmed), also after the
+  start, as the session was opened before it. New payments can still start only before the start.
+- **R3.2 Race between payment and cancel.** "Paid" is set by one conditional UPDATE that also
+  requires the reservation to be active; when it changes nothing, the payment is refunded. No
+  decision is taken on an earlier read.
+- **R3.3 500 after a real cancel.** The refund after a guest cancel no longer fails the request:
+  errors are logged; a failed refund is already visible as `refund_failed` and ⚠️ in Telegram.
+- **R3.4 Open checkout after a cancel.** A cancel (guest or café) moves the booking's unfinished
+  checkouts to `expired` and closes their Stripe pages (best effort).
+- **R3.5 Untracked Stripe page.** If storing the session id fails after Stripe created the session,
+  the session is closed at Stripe too.
+- **R3.6 (left as is)** the return check on page load has no own rate limit: it needs the token.
+- **R3.7 D1 bound parameters.** The admin day list reads orders with one query by date (no list of
+  ids, which D1 limits to 100 parameters).
+- **R3.8 Hidden failed refund.** The admin shows a `refund_failed` order before a `paid` one.
+
+Tests for R3.1–R3.5 and R3.8; R3.7 is covered by the admin day tests.

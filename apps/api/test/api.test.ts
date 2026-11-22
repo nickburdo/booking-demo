@@ -166,7 +166,8 @@ describe("GET /reservations/:token", () => {
     const { body } = await create();
     const res = await call(`/reservations/${body.token}`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reservation: body.reservation });
+    // v7: the answer also has the pre-order (none here).
+    expect(await res.json()).toEqual({ reservation: body.reservation, order: null });
   });
 
   it("answers 404 for an unknown token", async () => {

@@ -10,6 +10,9 @@ import { clock } from "./clock";
 import { ALLOWED_ORIGINS } from "./config";
 import { HttpError } from "./errors";
 import { handoffInBackground, notifyInBackground } from "./notify";
+import { createOrder, orderForGuest, recordExpired, recordPayment, refundAfterGuestCancel } from "./orders";
+import { payments } from "./payments";
+import type { ReservationRow } from "./repo";
 import type { TelegramConfig } from "./telegram";
 import { verifyTurnstile } from "./turnstile";
 import {
@@ -20,6 +23,7 @@ import {
   chatMessageBody,
   chatStartBody,
   loginBody,
+  orderBody,
   parse,
   reservationBody,
 } from "./validation";
@@ -33,6 +37,19 @@ function telegramConfig(): TelegramConfig {
 const app = express();
 
 app.use(cors({ origin: ALLOWED_ORIGINS }));
+
+// --- Stripe webhook (v7, ADR-028): before express.json, because the signature covers the raw body.
+app.post("/payments/stripe/webhook", express.raw({ type: "*/*", limit: "64kb" }), async (req, res) => {
+  const body = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+  const event = await payments.verifyWebhook(body, req.get("stripe-signature"));
+  if (event.kind === "completed" && event.session.orderId && event.session.paid) {
+    await recordPayment(env.DB, event.session.orderId, event.session.paymentIntentId, clock.now(), telegramConfig());
+  } else if (event.kind === "expired" && event.session.orderId) {
+    await recordExpired(env.DB, event.session.orderId);
+  }
+  res.json({ received: true });
+});
+
 app.use(express.json({ limit: "10kb" }));
 
 app.get("/health", (_req, res) => {
@@ -73,13 +90,36 @@ app.post("/reservations", async (req, res) => {
 });
 
 app.get("/reservations/:token", async (req, res) => {
-  res.json({ reservation: await getReservation(env.DB, req.params.token) });
+  const reservation = await getReservation(env.DB, req.params.token);
+  // v7: the pre-order, after asking Stripe about an unfinished checkout (the return check, P7b).
+  res.json({ reservation, order: await orderForGuest(env.DB, reservation.id, clock.now(), telegramConfig()) });
 });
+
+/** A guest cancelled (page, scripted or AI chat): tell the owner, refund a paid pre-order (v7 P9). */
+async function afterGuestCancel(row: ReservationRow): Promise<void> {
+  notifyInBackground(env.DB, telegramConfig(), "cancelled", row, clock.now);
+  try {
+    await refundAfterGuestCancel(env.DB, row, clock.now(), telegramConfig());
+  } catch (error) {
+    // The cancel itself is done; a failed refund is visible as refund_failed / ⚠️ (v7 R3.3).
+    console.error(`Refund after the cancel of ${row.id} failed:`, error);
+  }
+}
 
 app.post("/reservations/:token/cancel", async (req, res) => {
   const { reservation, row } = await cancelByToken(env.DB, req.params.token, clock.now());
-  notifyInBackground(env.DB, telegramConfig(), "cancelled", row, clock.now);
-  res.json({ reservation });
+  await afterGuestCancel(row);
+  res.json({ reservation, order: await orderForGuest(env.DB, row.id, clock.now(), telegramConfig()) });
+});
+
+// --- Pre-order (v7): docs/api.md → Pre-order and prepayment ----------------------------------
+
+app.post("/reservations/:token/order", async (req, res) => {
+  // Each call opens a Stripe session, so it shares the booking limiter (own key prefix).
+  const { success } = await env.CREATE_LIMITER.limit({ key: `order:${req.get("cf-connecting-ip") ?? "unknown"}` });
+  if (!success) throw new HttpError(429, "RATE_LIMITED", "Too many payment requests. Try again in a minute.");
+  const input = parse(orderBody, req.body ?? {});
+  res.json(await createOrder(env.DB, req.params.token, input, siteUrl(req.get("origin")), clock.now()));
 });
 
 // --- Chat (v5): docs/api.md → Chat, ADR-023/024 --------------------------------------------
@@ -115,7 +155,7 @@ app.post("/chat/sessions/current/messages", async (req, res) => {
   const { turn, effects } = await replyToChat(env.DB, chatToken(req.get("authorization")), input, siteUrl(req.get("origin")), clock.now());
   // Same notifications as the form and the guest page (ADR-018); a person hand-off (v5 plan, P7).
   if (effects.booked) notifyInBackground(env.DB, telegramConfig(), "created", effects.booked, clock.now);
-  if (effects.cancelled) notifyInBackground(env.DB, telegramConfig(), "cancelled", effects.cancelled, clock.now);
+  if (effects.cancelled) await afterGuestCancel(effects.cancelled);
   if (effects.person) handoffInBackground(telegramConfig(), effects.person);
   res.json({ turn });
 });

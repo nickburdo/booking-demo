@@ -98,10 +98,10 @@ async function act(r: AdminReservation, action: AdminAction, reason?: string) {
     if (code === 'UNAUTHORIZED') return
     rowErrors.value = {
       ...rowErrors.value,
-      [r.id]: code === 'NOT_ALLOWED' || code === 'NETWORK' ? t(`admin.errors.${code}`) : t('admin.errors.generic'),
+      [r.id]: code === 'NOT_ALLOWED' || code === 'NETWORK' || code === 'PAID_BOOKING' ? t(`admin.errors.${code}`) : t('admin.errors.generic'),
     }
     // Someone else may have changed it: show the current state.
-    if (code === 'NOT_ALLOWED' || code === 'NOT_FOUND') {
+    if (code === 'NOT_ALLOWED' || code === 'NOT_FOUND' || code === 'PAID_BOOKING') {
       const keep = rowErrors.value
       await load()
       rowErrors.value = keep
