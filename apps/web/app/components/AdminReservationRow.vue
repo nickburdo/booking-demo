@@ -2,6 +2,7 @@
 // One reservation in the admin day view (docs/design.md §6, Admin). Shows only the actions the
 // API allows now (ADR-022); the API stays the authority and answers NOT_ALLOWED otherwise.
 import type { AdminAction, AdminReservation } from '~/composables/useAdminApi'
+import { cafe } from '~/data/cafe'
 
 // `now`: Kyiv "YYYY-MM-DD HH:MM" from the page's ticking clock (v4 R2.2).
 const props = defineProps<{ reservation: AdminReservation, busy: boolean, error: string | null, now: string }>()
@@ -13,7 +14,25 @@ const { t } = useI18n()
 const started = computed(() => `${props.reservation.date} ${props.reservation.time}` <= props.now)
 const live = computed(() => props.reservation.status === 'pending' || props.reservation.status === 'confirmed')
 const canConfirm = computed(() => props.reservation.status === 'pending' && !started.value)
-const canCancel = computed(() => live.value && !started.value)
+// v7 (ADR-029): the café cannot cancel a booking with a paid pre-order; no-show stays.
+const paidOrder = computed(() => props.reservation.order?.status === 'paid')
+const canCancel = computed(() => live.value && !started.value && !paidOrder.value)
+const localized = useLocalized()
+const { locale } = useI18n()
+const menuNames = new Map(cafe.menu.flatMap((c) => c.items).map((i) => [i.id, i.name]))
+const orderLine = computed(() => {
+  const o = props.reservation.order
+  if (!o) return ''
+  const dishes = o.items.map((i) => `${menuNames.has(i.id) ? localized(menuNames.get(i.id)!) : i.name} × ${i.quantity}`).join(', ')
+  const euros = new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR' }).format(o.amount / 100)
+  return t('admin.order.line', { dishes, amount: `${o.discounted} ₴ · ${euros}` })
+})
+const orderTag = computed(() => ({
+  paid: 'bg-espresso text-milk',
+  refunded: 'bg-line text-espresso',
+  refund_failed: 'bg-[#f6dfa8] text-[#6b4500]',
+  checkout: '',
+})[props.reservation.order?.status ?? 'checkout'])
 const canNoShow = computed(() => live.value && started.value)
 
 const statusLabel = computed(() => {
@@ -62,10 +81,14 @@ watch(() => props.reservation.status, () => (panel.value = null))
       <p class="font-medium">
         {{ reservation.name }}
         <span v-if="reservation.demo" class="ml-1.5 rounded border border-line px-1.5 text-[11px] font-semibold tracking-wide text-steam uppercase">{{ t('admin.demoTag') }}</span>
+        <span v-if="reservation.order" class="ml-1.5 rounded px-1.5 align-[2px] text-[11px] font-semibold tracking-wide uppercase" :class="orderTag">{{ t(`admin.order.tag.${reservation.order.status}`) }}</span>
       </p>
       <p class="text-[15px] text-steam">{{ reservation.phone }}</p>
       <p v-if="reservation.comment" class="mt-1 text-[15px]">“{{ reservation.comment }}”</p>
       <p v-if="reservation.cancelReason" class="mt-1 text-[15px]">{{ t('admin.reasonShown', { reason: reservation.cancelReason }) }}</p>
+      <p v-if="reservation.order" class="mt-1.5 rounded-[10px] bg-milk px-3 py-1.5 text-[15px] text-espresso">
+        {{ orderLine }}<template v-if="reservation.order.status === 'paid' && live && started"> · {{ t('admin.order.noShowKeeps') }}</template>
+      </p>
     </div>
 
     <div class="text-right lg:text-left max-lg:order-2">
@@ -82,6 +105,7 @@ watch(() => props.reservation.status, () => (panel.value = null))
         <button v-if="canCancel" type="button" class="rounded-[10px] border-2 border-error px-3.5 py-1.5 text-[15px] font-semibold text-error disabled:opacity-70" :disabled="busy" @click="openCancel">
           {{ t('admin.actions.cancel') }}
         </button>
+        <span v-if="paidOrder && live && !started" class="text-[13px] text-steam">{{ t('admin.order.cantCancel') }}</span>
         <button v-if="canNoShow" type="button" class="rounded-[10px] border-2 border-espresso px-3.5 py-1.5 text-[15px] font-semibold disabled:opacity-70" :disabled="busy" @click="panel = 'no-show'">
           {{ t('admin.actions.noShow') }}
         </button>

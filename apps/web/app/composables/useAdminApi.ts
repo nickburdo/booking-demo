@@ -1,6 +1,6 @@
 // Admin API client (v4, docs/api.md → Admin, ADR-020). The session token lives in
 // sessionStorage and goes out as a bearer header; a 401 ends the session and opens the login.
-import { ApiError, apiRequest, type ReservationStatus } from '~/composables/useBookingApi'
+import { ApiError, apiRequest, type ReservationStatus, type Order } from '~/composables/useBookingApi'
 
 export interface AdminReservation {
   id: string
@@ -17,6 +17,8 @@ export interface AdminReservation {
   cancelReason: string | null
   notified: boolean
   demo: boolean
+  /** v7: the pre-order if one was paid (also refunded or with a failed refund). */
+  order: Order | null
 }
 
 export type AdminAction = 'confirm' | 'cancel' | 'no-show'
