@@ -57,6 +57,8 @@ export interface ChatState {
   awaiting: Input;
   /** "Pass to a person" works once per conversation (ADR-024). */
   personSent: boolean;
+  /** Set while a request handles this step (v5 R2.2): ISO time of the claim. */
+  busySince?: string;
 }
 
 export type Outcome = "left" | "questions" | "found" | "person" | "booked";

@@ -39,13 +39,17 @@ async function open(chat: AdminChat, focus = true) {
   selected.value = chat
   transcriptState.value = 'loading'
   try {
-    transcript.value = (await admin.chat(chat.id)).messages
+    const messages = (await admin.chat(chat.id)).messages
+    // A later click won: do not show this transcript under another chat's header (v5 R2.4).
+    if (selected.value?.id !== chat.id) return
+    transcript.value = messages
     transcriptState.value = 'ready'
     if (focus) {
       await nextTick()
       transcriptBox.value?.focus()
     }
   } catch (error) {
+    if (selected.value?.id !== chat.id) return
     if (error instanceof ApiError && error.code === 'UNAUTHORIZED') return
     transcriptState.value = 'error'
   }

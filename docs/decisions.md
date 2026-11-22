@@ -252,7 +252,8 @@ has confirmed it in discussion.
 - **Status:** Accepted (2026-11-22, v5 plan)
 - **Decision:** Conversations are stored (`chat_sessions`, `chat_messages`) and shown in the
   admin. Guest answers that are personal (`name`, `phone`) are marked when saved and masked
-  when shown (ADR-021); other text is shown as written. Conversations are deleted after 7 days
+  when shown (ADR-021); other text is shown as written. Reservation tokens are never stored in a
+  conversation: links are saved as `…/reservation#••••` (ADR-013; v5 plan, R2.1). Conversations are deleted after 7 days
   (clean-up when a new conversation starts, no cron). A conversation needs Turnstile once at the
   start; then 30 messages per minute per IP, 60 guest messages per conversation, and one
   "pass to a person" Telegram message to the owner per conversation.

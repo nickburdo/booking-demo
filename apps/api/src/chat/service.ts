@@ -6,7 +6,7 @@ import { HttpError } from "../errors";
 import { maskName, maskPhone } from "../mask";
 import { generateToken, hashToken } from "../token";
 import { normalisePhone } from "../validation";
-import { checkInput, handle, start } from "./engine";
+import { checkInput, handle, start, tokenFromLink } from "./engine";
 import {
   CHAT_RETENTION_DAYS,
   claimStep,
@@ -15,6 +15,7 @@ import {
   findLiveSession,
   listChats,
   listMessages,
+  releaseStep,
   saveTurn,
   type ChatListRow,
   type ChatSessionRow,
@@ -80,26 +81,60 @@ export async function replyToChat(
   if (row.guest_messages >= MAX_GUEST_MESSAGES) {
     throw new HttpError(409, "CHAT_LIMIT", "This conversation is too long. Start a new one.");
   }
-  const state = JSON.parse(row.state) as ChatState;
+  const { busySince, ...state } = JSON.parse(row.state) as ChatState;
+  const conflict = () =>
+    new HttpError(409, "CHAT_CONFLICT", "Another message for this step is being handled. Reload the conversation.");
+  // Another request is working on this step (v5 R2.2). A mark older than BUSY_MS is from a request
+  // that died half-way and no longer blocks the conversation.
+  if (busySince && now.getTime() - Date.parse(busySince) < BUSY_MS) throw conflict();
+
   const guest = checkInput(state.awaiting, input);
   if (!guest) throw new HttpError(400, "VALIDATION", "This answer does not fit the current question.");
 
-  if (!(await claimStep(db, row.id, row.version))) {
-    throw new HttpError(409, "CHAT_CONFLICT", "Another message for this step is being handled. Reload the conversation.");
-  }
+  // Claim the step and mark it busy in one write, so a later request sees the mark (v5 R2.2).
+  if (!(await claimStep(db, row.id, row.version, { ...state, busySince: now.toISOString() }))) throw conflict();
 
   const ctx: ChatContext = { locale: row.locale, now, siteUrl, services };
-  const result = await handle(ctx, state, input);
+  let result: Awaited<ReturnType<typeof handle>>;
+  try {
+    result = await handle(ctx, state, input);
+  } catch (error) {
+    await releaseStep(db, row.id, state).catch(() => {}); // best effort; the mark expires anyway
+    throw error;
+  }
   const outcome =
     result.effects.outcome && OUTCOME_RANK[result.effects.outcome] > OUTCOME_RANK[row.outcome] ? result.effects.outcome : row.outcome;
-  await saveTurn(db, row, {
-    state: result.state,
-    outcome,
-    reservationId: result.effects.booked?.id ?? row.reservation_id,
-    messages: [{ sender: "guest", field: guest.field, text: guest.label }, ...botMessages(result.turn)],
-    now,
-  });
+  try {
+    await saveTurn(db, row, {
+      state: result.state,
+      outcome,
+      reservationId: result.effects.booked?.id ?? row.reservation_id,
+      // Stored without reservation tokens (v5 R2.1, ADR-013): the guest sees the link in this
+      // response only; the transcript and the history keep "…#••••".
+      messages: [
+        { sender: "guest", field: guest.field, text: redactTokens(guest.label, guest.field) },
+        ...botMessages(result.turn).map((m) => ({ ...m, text: redactTokens(m.text, null) })),
+      ],
+      now,
+    });
+  } catch (error) {
+    // The action already happened (a booking, a cancellation, a message to the owner): answer
+    // with its result anyway, so the guest does not repeat it and the owner is notified (v5 R2.3).
+    const done = result.effects.booked || result.effects.cancelled || result.effects.person;
+    if (!done) throw error;
+    console.error("Chat turn saved partly; the action itself succeeded:", error);
+  }
   return { turn: result.turn, effects: result.effects };
+}
+
+/** A request that died half-way leaves its "busy" mark for at most this long (v5 R2.2). */
+export const BUSY_MS = 30_000;
+
+/** Replaces reservation tokens with "••••" in text that is stored (v5 R2.1). */
+export function redactTokens(text: string, field: string | null): string {
+  const masked = text.replace(/#[A-Za-z0-9_-]{20,100}/g, "#••••");
+  // A bare token pasted as the "link" answer.
+  return field === "link" && tokenFromLink(masked) ? "••••" : masked;
 }
 
 export async function chatHistory(

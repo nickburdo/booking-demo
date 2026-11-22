@@ -63,15 +63,21 @@ export async function findLiveSession(db: D1Database, tokenHash: string, now: Da
 }
 
 /**
- * Claims the current step (v5 plan, R3): bumps the version only if nobody else did. A second
- * request for the same step gets false, so an action such as a booking cannot run twice.
+ * Claims the current step (v5 plan R3, R2.2): bumps the version only if nobody else did, and in the
+ * same write stores the state with its "busy" mark. A second request either loses the version
+ * race or reads the mark, so an action such as a booking cannot run twice.
  */
-export async function claimStep(db: D1Database, id: string, version: number): Promise<boolean> {
+export async function claimStep(db: D1Database, id: string, version: number, busyState: ChatState): Promise<boolean> {
   const result = await db
-    .prepare("UPDATE chat_sessions SET version = version + 1 WHERE id = ? AND version = ?")
-    .bind(id, version)
+    .prepare("UPDATE chat_sessions SET version = version + 1, state = ? WHERE id = ? AND version = ?")
+    .bind(JSON.stringify(busyState), id, version)
     .run();
   return result.meta.changes === 1;
+}
+
+/** Puts back the state without the busy mark after a failed step (best effort). */
+export async function releaseStep(db: D1Database, id: string, state: ChatState): Promise<void> {
+  await db.prepare("UPDATE chat_sessions SET state = ? WHERE id = ?").bind(JSON.stringify(state), id).run();
 }
 
 /** Saves the new state and the turn's messages (guest message first, then the bot's). */

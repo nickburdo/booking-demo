@@ -177,7 +177,12 @@ function choose(option: ChatOption) {
 function submitText() {
   if (input.value.kind !== 'text') return
   const text = draft.value.trim()
-  if (!text && !input.value.optional) return
+  if (!text) {
+    // Empty optional answer = the "Skip" option, so no empty bubble is sent (v5 R2.5).
+    const skip = input.value.optional ? input.value.options.find((o) => o.id === 'skip') : undefined
+    if (skip) choose(skip)
+    return
+  }
   send({ text }, text)
 }
 

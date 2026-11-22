@@ -141,3 +141,23 @@ both chats, instead of replacing one with the other.
 
 **Done when:** R1.1–R1.3 checked on the built site; ADR-023 updated; README in 6.2.
 
+
+## Revision R2 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v5-chat` found five issues; all confirmed in the
+code.
+
+**Decision (user):**
+- R2.1 Reservation tokens are no longer stored in conversations: the booked-link bot message and
+  a pasted link are saved as `…/reservation#••••` (ADR-013). The guest sees the full link in the
+  response only; the bot asks to save it now, because it is hidden in the chat after a reload.
+- R2.2 The step claim now also stores a "busy" mark in the state in the same write; a request that
+  finds the mark gets `409 CHAT_CONFLICT`, so a booking cannot run twice. A mark older than 30 s is
+  ignored (a request that died half-way).
+- R2.3 If saving the turn fails after the action happened (booking, cancellation, message to the
+  owner), the guest still gets the result and the owner is notified; the error is logged.
+- R2.4 Admin chats: a slow transcript response no longer replaces the one of a chat clicked later.
+- R2.5 Widget: an empty optional comment counts as "Skip" (no empty bubble).
+
+**Done when:** API tests and typecheck green; R2.4/R2.5 checked on the built site; API and web
+redeployed (ask first).

@@ -307,6 +307,76 @@ describe("chat input checks and limits", () => {
   });
 });
 
+describe("code review fixes (v5 R2)", () => {
+  const TOKEN_RE = /[A-Za-z0-9_-]{43}/;
+
+  it("stores no reservation token: the guest sees the link once, the history and admin see #•••• (R2.1)", async () => {
+    const { token, summary } = await toSummary();
+    expect(summary.res.status).toBe(200);
+    const done = await say(token, { choice: "confirm" });
+    const link = texts(done.body.turn).match(/reservation#([A-Za-z0-9_-]{43})/)![1]!;
+
+    // The guest pastes the link back in the find flow, as a link and as a bare token
+    await say(token, { choice: "find" });
+    await say(token, { text: `https://x.test/reservation#${link}` });
+    await say(token, { choice: "menu" });
+    await say(token, { choice: "find" });
+    await say(token, { text: link });
+
+    const stored = await env.DB.prepare("SELECT text FROM chat_messages").all<{ text: string }>();
+    const all = stored.results.map((r) => r.text).join("\n");
+    expect(all).not.toContain(link);
+    expect(all).not.toMatch(TOKEN_RE);
+    expect(all).toContain("reservation#••••");
+
+    const history = (await (await call("/chat/sessions/current", { headers: { authorization: `Bearer ${token}` } })).json()) as any;
+    expect(JSON.stringify(history)).not.toContain(link);
+  });
+
+  it("refuses a message while another request is working on the step; a stale mark does not block (R2.2)", async () => {
+    const { token } = await toSummary();
+    const markBusy = (at: Date) =>
+      env.DB.prepare("UPDATE chat_sessions SET state = json_set(state, '$.busySince', ?)").bind(at.toISOString()).run();
+
+    await markBusy(new Date(NOW.getTime() - 5_000));
+    const blocked = await say(token, { choice: "confirm" });
+    expect(blocked.res.status).toBe(409);
+    expect(blocked.body.error.code).toBe("CHAT_CONFLICT");
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM reservations").first<{ n: number }>())!.n).toBe(0);
+
+    await markBusy(new Date(NOW.getTime() - 31_000));
+    expect((await say(token, { choice: "confirm" })).res.status).toBe(200);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM reservations").first<{ n: number }>())!.n).toBe(1);
+    // The saved state no longer carries the mark
+    const state = await env.DB.prepare("SELECT json_extract(state, '$.busySince') AS b FROM chat_sessions").first<any>();
+    expect(state.b).toBeNull();
+  });
+
+  it("answers with the booking and notifies the owner even if saving the turn fails (R2.3)", async () => {
+    const { token } = await toSummary();
+    // Occupy the next message slot, so the save batch fails on the primary key
+    const s = await env.DB.prepare("SELECT id, message_count FROM chat_sessions").first<any>();
+    await env.DB.prepare("INSERT INTO chat_messages (session_id, seq, sender, text, created_at) VALUES (?, ?, 'bot', 'x', ?)")
+      .bind(s.id, s.message_count, NOW.toISOString())
+      .run();
+
+    const done = await say(token, { choice: "confirm" });
+    expect(done.res.status).toBe(200);
+    expect(texts(done.body.turn)).toContain("Your table is booked");
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM reservations").first<{ n: number }>())!.n).toBe(1);
+    await waitFor(async () => outbound.telegramCalls.some((c) => String(c.body.text).startsWith("🆕")));
+  });
+
+  it("still fails a step without side effects when saving fails", async () => {
+    const { body } = await startChat();
+    const s = await env.DB.prepare("SELECT id, message_count FROM chat_sessions").first<any>();
+    await env.DB.prepare("INSERT INTO chat_messages (session_id, seq, sender, text, created_at) VALUES (?, ?, 'bot', 'x', ?)")
+      .bind(s.id, s.message_count, NOW.toISOString())
+      .run();
+    expect((await say(body.token, { choice: "faq" })).res.status).toBe(500);
+  });
+});
+
 describe("admin chat views", () => {
   it("lists conversations and shows transcripts with name and phone masked", async () => {
     const { token } = await toSummary("Olena Kovalenko");
