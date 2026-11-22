@@ -434,7 +434,8 @@ server; `locale` picks the language of Stripe's page and of the return URL. Allo
 replaced.
 
 `200` → `{ "url": "https://checkout.stripe.com/…" }` — the guest's browser goes there and comes back
-to the reservation page. The session expires after 30 minutes.
+to the reservation page. The session expires after 30 minutes. Stripe's page accepts cards only
+(v7 R2).
 
 Errors: `400 VALIDATION`, `404 NOT_FOUND`, `409 ORDER_NOT_ALLOWED`, `503 PAYMENTS_UNAVAILABLE`.
 

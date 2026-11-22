@@ -67,6 +67,8 @@ export const payments = {
     try {
       const session = await client().checkout.sessions.create({
         mode: "payment",
+        // Cards only: some other methods confirm later with an event the API does not handle (v7 R2).
+        allowed_payment_method_types: ["card"],
         line_items: req.lines.map((line) => ({
           quantity: line.quantity,
           price_data: { currency: req.currency, unit_amount: line.unitAmount, product_data: { name: line.name } },

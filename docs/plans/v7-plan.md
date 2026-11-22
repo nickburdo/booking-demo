@@ -170,3 +170,15 @@ own rate (+4%); with `adaptive_pricing[enabled]=false` only the euro amount is s
 cannot be changed without verifying a business (the dashboard locks "Manage sandboxes"). Every
 Checkout Session therefore sets `branding_settings[display_name]=Linden Coffee`, so the page shows
 the café's name (checked). Only the browser tab title keeps the sandbox name; accepted by the user.
+
+## Revision R2 (2026-11-22) — card payments only (approved)
+
+**Trigger:** the Phase 4 check on Stripe's page. Besides cards, Stripe offered MB WAY, Bancontact,
+Satispay and EPS (the account's dynamic payment methods). Some methods confirm the payment later,
+with a separate event (`checkout.session.async_payment_succeeded`), which the API does not handle:
+such an order would stay unpaid.
+
+**Decision (user):** every Checkout Session accepts cards only. Implemented with
+`allowed_payment_method_types: ["card"]`: from Stripe API version `2026-09-30` the older
+`payment_method_types` cannot be passed (Stripe docs, "Restrict payment methods in code"). The demo stays
+on the clear path card → paid → refund. Docs: `docs/api.md` (pre-order), ADR-028.
