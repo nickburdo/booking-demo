@@ -1,9 +1,8 @@
 # Booking API
 
-Status: **v2 and v3 — implemented** (2026-11-21); **v4 changes planned**
-(`docs/plans/v4-plan.md`): statuses `confirmed` and `no_show`, the [admin endpoints](#admin-v4)
-and new fields on the reservation object. Examples below are real responses from the live v2
-API (the example reservation was cancelled afterwards).
+Status: **v2–v4 — implemented** (2026-11-22); **v5 changes planned** (`docs/plans/v5-plan.md`):
+the [chat endpoints](#chat-v5) and the admin chat list. Examples below are real responses from
+the live v2 API (the example reservation was cancelled afterwards).
 
 The single backend for every booking interface: the form (v3), the admin (v4) and both chats
 (v5–v6) go through these endpoints and these rules only.
@@ -72,8 +71,11 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 409 | `NOT_CANCELLABLE` | Reservation already cancelled, no-show, or already started |
 | 409 | `NOT_ALLOWED` | Admin action not allowed for the reservation's current status or time (v4) |
 | 409 | `DEMO_LIMIT` | 20 or more active demo reservations already exist (v4) |
+| 401 | `CHAT_EXPIRED` | Chat request without a valid chat token (missing, unknown or silent for 2 hours) — start a new conversation (v5) |
+| 409 | `CHAT_CONFLICT` | Two chat messages for the same step at once; reload the conversation (v5) |
+| 409 | `CHAT_LIMIT` | The conversation reached 60 guest messages (v5) |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
-| 429 | `RATE_LIMITED` | Too many create (or, v4, admin login / demo data) requests from this IP |
+| 429 | `RATE_LIMITED` | Too many create (or, v4, admin login / demo data; v5, chat) requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
 | 503 | `VERIFICATION_UNAVAILABLE` | Turnstile could not be reached; the booking is refused, try again (v3) |
 
@@ -284,6 +286,64 @@ list). Cancel and no-show free the table. Errors: `400 VALIDATION`, `401 UNAUTHO
 Adds up to 6 made-up reservations over the next 3 days at free times (normal booking rules,
 no Telegram), marked as demo → `201 { "created": 6 }`. Errors: `401 UNAUTHORIZED`,
 `409 DEMO_LIMIT` (20 or more active demo reservations), `429 RATE_LIMITED`.
+
+## Chat (v5)
+
+A scripted chat (no AI) for the landing page (ADR-023, ADR-024). The **server** runs the
+dialogue: it keeps the state, writes every text in the guest's language and tells the widget
+what input it expects. Bookings, lookups and cancellations go through the same services and
+rules as the endpoints above; a booking from the chat sends the usual Telegram message.
+
+**Conversation token.** `POST /chat/sessions` checks a Turnstile token once and returns a chat
+token; the other chat endpoints need it as `Authorization: Bearer <token>`. Only its hash is
+stored. After 2 hours without messages → `401 CHAT_EXPIRED` (the widget starts a new one).
+
+**Bot turn** — every chat response has this shape:
+
+```json
+{
+  "messages": [{ "text": "How many guests?" }],
+  "input": { "kind": "choices", "options": [{ "id": "1", "label": "1" }, { "id": "2", "label": "2" }, { "id": "menu", "label": "Main menu" }] }
+}
+```
+
+`input` is one of: `{ "kind": "choices", "options": [{ id, label }] }`,
+`{ "kind": "text", "field": "name" | "phone" | "comment" | "link" | "question", "placeholder", "maxLength", "optional" }`,
+or `{ "kind": "none" }` (the conversation is over; the widget offers to start again).
+
+**Limits:** 30 messages per 60 s per IP (`429 RATE_LIMITED`); 60 guest messages per
+conversation (`409 CHAT_LIMIT`); "pass to a person" once per conversation; text answers up to
+500 characters.
+
+### `POST /chat/sessions`
+
+Body: `{ "turnstileToken": "…", "locale": "en" | "ru" | "uk" }` →
+`201 { "token": "…", "turn": { messages, input } }` (greeting and the main menu).
+Errors: `400 VALIDATION`, `400 VERIFICATION_FAILED`, `429 RATE_LIMITED`,
+`503 VERIFICATION_UNAVAILABLE`.
+
+### `POST /chat/sessions/current/messages`
+
+Body: `{ "choice": "<option id>" }` when the last turn offered choices, or
+`{ "text": "…" }` when it asked for text → `200 { "turn": { messages, input } }`.
+A choice that was not offered, or text when choices were expected → `400 VALIDATION`.
+Errors: `400 VALIDATION`, `401 CHAT_EXPIRED`, `409 CHAT_CONFLICT`, `409 CHAT_LIMIT`,
+`429 RATE_LIMITED`.
+
+### `GET /chat/sessions/current`
+
+The conversation so far (to continue after a page reload):
+`200 { "messages": [{ "sender": "guest" | "bot", "text": "…" }], "input": { … } }`.
+Errors: `401 CHAT_EXPIRED`.
+
+### Admin: `GET /admin/chats` and `GET /admin/chats/:id`
+
+Admin session required (see Admin). The list covers the last 7 days, newest first:
+`{ "chats": [{ "id", "startedAt", "locale", "outcome": "booked" | "found" | "questions" | "person" | "left", "messages": 12 }] }`.
+A transcript: `{ "chat": { …list fields, "reservationDate": "2026-12-05" | null }, "messages": [{ "sender", "text", "at" }] }`
+— the guest's name and phone answers are masked like reservations; other text is shown as
+written. Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
+`404 NOT_FOUND`.
 
 ## How double booking is prevented
 

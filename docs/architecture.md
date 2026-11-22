@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1–v4 implemented** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1–v4 implemented, v5 planned** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -214,3 +214,15 @@ Learned in v4:
 - Vue I18n needs explicit plural rules for Russian and Ukrainian (one / few / many).
 - A public admin demo shapes the product: no messages to guests, masked data, and an honest
   "demo limitations" note instead of features that would be risky with strangers in the admin.
+
+## Scripted chat (v5) — planned
+
+Plan: `docs/plans/v5-plan.md`. Contract: `docs/api.md` → Chat. Decisions: ADR-023 … ADR-025.
+
+- `packages/cafe-data`: café content (name, address, hours, menu in EN/RU/UK) shared by the
+  site and the API; the API's booking hours come from it.
+- API: `src/chat/` — engine (state machine: book, find booking, questions, person), texts in
+  three languages, endpoints `/chat/sessions…`; migration `0005` (`chat_sessions`,
+  `chat_messages`); `CHAT_LIMITER` binding; admin endpoints `/admin/chats…` with masking.
+- Web: `ChatWidget.vue` on the landing page (Turnstile at the start, renders bot turns, token in
+  `sessionStorage`); admin "Chats" tab with the list and transcripts.

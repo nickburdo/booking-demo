@@ -228,3 +228,46 @@ has confirmed it in discussion.
 - **Consequences:** The `CHECK` constraint on `reservations.status` changes, which in SQLite
   means rebuilding the table (migration `0004`). Interfaces only show actions the API allows;
   the API stays the authority.
+
+## ADR-023 — Scripted chat as a server-side state machine over the same services
+
+- **Status:** Accepted (2026-11-22, v5 plan)
+- **Context:** The roadmap adds booking interfaces one by one: form (v3), scripted chat (v5),
+  AI chat (v6). The anti-goal is an interface that books around the validated backend.
+- **Decision:** The chat dialogue runs on the server as an explicit state machine in
+  `apps/api/src/chat/`, separate from HTTP and storage. It calls the same booking services as
+  the form (`getAvailability`, `createReservation`, `getReservation`, `cancelByToken`). Each
+  response is a "bot turn": messages written by the server in the guest's language plus the
+  input it expects (choices, a text field, or none). The widget only renders turns.
+- **Alternatives rejected:** a state machine in the browser calling the public endpoints
+  (simpler now, but v6 needs the dialogue on the server for the AI key, and texts would be
+  split); free-text rules (many "did not understand" replies — the problem v6 solves).
+- **Consequences:** v6 can replace the engine with an AI that returns the same turn shape and
+  calls the same services as tools. Chat texts live in the API, not in the site's locale files.
+  The Turnstile check at the start of a conversation covers bookings made in it.
+
+## ADR-024 — Chat conversations: storage, privacy and limits
+
+- **Status:** Accepted (2026-11-22, v5 plan)
+- **Decision:** Conversations are stored (`chat_sessions`, `chat_messages`) and shown in the
+  admin. Guest answers that are personal (`name`, `phone`) are marked when saved and masked
+  when shown (ADR-021); other text is shown as written. Conversations are deleted after 7 days
+  (clean-up when a new conversation starts, no cron). A conversation needs Turnstile once at the
+  start; then 30 messages per minute per IP, 60 guest messages per conversation, and one
+  "pass to a person" Telegram message to the owner per conversation.
+- **Consequences:** The public demo admin shows what guests wrote in free text (questions,
+  comments); the widget says so before the first question. Limits keep a verified browser from
+  flooding the owner's Telegram.
+
+## ADR-025 — Café data in a shared workspace package
+
+- **Status:** Accepted (2026-11-22, v5 plan)
+- **Context:** The chat on the server answers about hours, address and menu, which so far lived
+  only in the site (`apps/web/app/data/cafe.ts`); opening hours were also duplicated in the
+  API's `config.ts`.
+- **Decision:** A workspace package `packages/cafe-data` (TypeScript source, no build step)
+  holds the café content in three languages. The site and the API import it; the API derives
+  its booking hours from it. `docs/cafe.md` stays the source of truth for the content.
+- **Consequences:** One place to change café content in code. Both bundlers (Vite for Nuxt,
+  esbuild for Wrangler) compile the package from source.
+
