@@ -5,15 +5,19 @@ import express, { type ErrorRequestHandler } from "express";
 import { addDemoReservations, applyAction, listDay, type AdminAction } from "./admin";
 import { login, logout, requireAdmin } from "./auth";
 import { cancelByToken, createReservation, getAvailability, getReservation } from "./booking";
+import { adminChatList, adminChatTranscript, chatHistory, replyToChat, startChat } from "./chat/service";
 import { clock } from "./clock";
+import { ALLOWED_ORIGINS } from "./config";
 import { HttpError } from "./errors";
-import { notifyInBackground } from "./notify";
+import { handoffInBackground, notifyInBackground } from "./notify";
 import type { TelegramConfig } from "./telegram";
 import { verifyTurnstile } from "./turnstile";
 import {
   adminCancelBody,
   adminDayQuery,
   availabilityQuery,
+  chatMessageBody,
+  chatStartBody,
   loginBody,
   parse,
   reservationBody,
@@ -24,8 +28,6 @@ function telegramConfig(): TelegramConfig {
   return { botToken: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_CHAT_ID };
 }
 
-// Browser origins allowed to call the API (docs/api.md, ADR-015).
-const ALLOWED_ORIGINS = ["https://booking-demo-web.nick-burdo.workers.dev", "http://localhost:3000"];
 
 const app = express();
 
@@ -79,6 +81,48 @@ app.post("/reservations/:token/cancel", async (req, res) => {
   res.json({ reservation });
 });
 
+// --- Chat (v5): docs/api.md → Chat, ADR-023/024 --------------------------------------------
+
+async function limitChat(ip: string | undefined): Promise<void> {
+  const { success } = await env.CHAT_LIMITER.limit({ key: ip ?? "unknown" });
+  if (!success) throw new HttpError(429, "RATE_LIMITED", "Too many chat messages. Try again in a minute.");
+}
+
+/** The site the reservation link points to: the calling allowed origin, else the live site. */
+function siteUrl(origin: string | undefined): string {
+  return origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]!;
+}
+
+function chatToken(header: string | undefined): string | null {
+  const match = /^Bearer\s+(\S+)$/i.exec(header ?? "");
+  return match ? match[1]! : null;
+}
+
+app.post("/chat/sessions", async (req, res) => {
+  await limitChat(req.get("cf-connecting-ip"));
+  const { turnstileToken, locale } = parse(chatStartBody, req.body ?? {});
+  // One bot check per conversation; it also covers bookings made in it (ADR-023).
+  const verdict = await verifyTurnstile(env.TURNSTILE_SECRET, turnstileToken, req.get("cf-connecting-ip"));
+  if (verdict === "failed") throw new HttpError(400, "VERIFICATION_FAILED", "Bot check failed or expired. Try again.");
+  if (verdict === "unavailable") throw new HttpError(503, "VERIFICATION_UNAVAILABLE", "Bot check is unavailable. Try again later.");
+  res.status(201).json(await startChat(env.DB, locale, siteUrl(req.get("origin")), clock.now()));
+});
+
+app.post("/chat/sessions/current/messages", async (req, res) => {
+  await limitChat(req.get("cf-connecting-ip"));
+  const input = parse(chatMessageBody, req.body ?? {});
+  const { turn, effects } = await replyToChat(env.DB, chatToken(req.get("authorization")), input, siteUrl(req.get("origin")), clock.now());
+  // Same notifications as the form and the guest page (ADR-018); a person hand-off (v5 plan, P7).
+  if (effects.booked) notifyInBackground(env.DB, telegramConfig(), "created", effects.booked, clock.now);
+  if (effects.cancelled) notifyInBackground(env.DB, telegramConfig(), "cancelled", effects.cancelled, clock.now);
+  if (effects.person) handoffInBackground(telegramConfig(), effects.person);
+  res.json({ turn });
+});
+
+app.get("/chat/sessions/current", async (req, res) => {
+  res.json(await chatHistory(env.DB, chatToken(req.get("authorization")), clock.now()));
+});
+
 // --- Admin (v4): docs/api.md → Admin, ADR-020…022 -----------------------------------------
 
 /** Login and demo data share one per-IP limiter (v4 plan, P3); prefixes keep the counts apart. */
@@ -118,6 +162,14 @@ for (const action of ["confirm", "cancel", "no-show"] as AdminAction[]) {
 admin.post("/demo-reservations", async (req, res) => {
   await limitAdmin("demo", req.get("cf-connecting-ip"));
   res.status(201).json({ created: await addDemoReservations(env.DB, clock.now()) });
+});
+
+admin.get("/chats", async (_req, res) => {
+  res.json({ chats: await adminChatList(env.DB, clock.now()) });
+});
+
+admin.get("/chats/:id", async (req, res) => {
+  res.json(await adminChatTranscript(env.DB, req.params.id));
 });
 
 app.use("/admin", admin);

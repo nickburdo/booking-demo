@@ -308,7 +308,8 @@ stored. After 2 hours without messages → `401 CHAT_EXPIRED` (the widget starts
 ```
 
 `input` is one of: `{ "kind": "choices", "options": [{ id, label }] }`,
-`{ "kind": "text", "field": "name" | "phone" | "comment" | "link" | "question", "placeholder", "maxLength", "optional" }`,
+`{ "kind": "text", "field": "name" | "phone" | "comment" | "link" | "question", "placeholder", "maxLength", "optional", "options": [{ id, label }] }`
+(`options` are quick buttons next to the field, such as "Skip" or "Main menu"),
 or `{ "kind": "none" }` (the conversation is over; the widget offers to start again).
 
 **Limits:** 30 messages per 60 s per IP (`429 RATE_LIMITED`); 60 guest messages per

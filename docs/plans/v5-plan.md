@@ -1,6 +1,6 @@
 # v5 plan — Scripted chat on the same API
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R2
 - **Scope:** stage v5 of the roadmap (`docs/overview.md`): a chat widget on the landing page.
   The dialogue runs **on the server** as a scripted state machine (no AI) and uses the same
   booking services and rules as the form. The guest answers with buttons and a few text
@@ -124,3 +124,40 @@
 ### 6.2 README (status, chat, demo limitations), `docs/architecture.md` (v5 implemented,
   learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Revision R1 (2026-11-22) — scripted and AI chats side by side (approved)
+
+**Trigger:** after the live check (5.4) the user proposed to keep the scripted chat in v6 and show
+both chats, instead of replacing one with the other.
+
+**Decision (user):**
+- R1.1 The widget gets two tabs under its header: "Scripted" (default) and "AI".
+- R1.2 The AI tab says "coming soon" (what it will do, that it is v6 of the roadmap) with a button
+  back to the scripted chat; no bot check and no API calls there.
+- R1.3 Texts in EN/RU/UK; tabs follow the tablist keyboard pattern (arrows, Tab); switching tabs
+  keeps the scripted conversation.
+- R1.4 ADR-023: v6 adds the AI engine next to the scripted one (not instead of it); the README
+  mentions the second tab (6.2).
+
+**Done when:** R1.1–R1.3 checked on the built site; ADR-023 updated; README in 6.2.
+
+
+## Revision R2 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v5-chat` found five issues; all confirmed in the
+code.
+
+**Decision (user):**
+- R2.1 Reservation tokens are no longer stored in conversations: the booked-link bot message and
+  a pasted link are saved as `…/reservation#••••` (ADR-013). The guest sees the full link in the
+  response only; the bot asks to save it now, because it is hidden in the chat after a reload.
+- R2.2 The step claim now also stores a "busy" mark in the state in the same write; a request that
+  finds the mark gets `409 CHAT_CONFLICT`, so a booking cannot run twice. A mark older than 30 s is
+  ignored (a request that died half-way).
+- R2.3 If saving the turn fails after the action happened (booking, cancellation, message to the
+  owner), the guest still gets the result and the owner is notified; the error is logged.
+- R2.4 Admin chats: a slow transcript response no longer replaces the one of a chat clicked later.
+- R2.5 Widget: an empty optional comment counts as "Skip" (no empty bubble).
+
+**Done when:** API tests and typecheck green; R2.4/R2.5 checked on the built site; API and web
+redeployed (ask first).

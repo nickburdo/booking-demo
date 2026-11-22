@@ -45,6 +45,9 @@ export type ApiErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'NOT_ALLOWED'
   | 'DEMO_LIMIT'
+  | 'CHAT_EXPIRED'
+  | 'CHAT_CONFLICT'
+  | 'CHAT_LIMIT'
   | 'NETWORK'
 
 export class ApiError extends Error {

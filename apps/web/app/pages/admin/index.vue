@@ -131,6 +131,7 @@ async function addDemo() {
 <template>
   <div>
     <AdminHeader :logged-in="ready" @logout="admin.logout()" />
+    <AdminTabs />
     <main class="page-container section-pad min-h-[70vh]">
       <h1 class="font-display text-[26px] font-bold md:text-[34px]">{{ t('admin.day.title') }}</h1>
 

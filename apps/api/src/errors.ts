@@ -11,6 +11,9 @@ export type ErrorCode =
   | "NOT_CANCELLABLE"
   | "NOT_ALLOWED"
   | "DEMO_LIMIT"
+  | "CHAT_EXPIRED"
+  | "CHAT_CONFLICT"
+  | "CHAT_LIMIT"
   | "PAYLOAD_TOO_LARGE"
   | "RATE_LIMITED"
   | "INTERNAL";

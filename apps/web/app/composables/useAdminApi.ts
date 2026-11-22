@@ -21,6 +21,22 @@ export interface AdminReservation {
 
 export type AdminAction = 'confirm' | 'cancel' | 'no-show'
 
+/** A chat conversation in the admin list (v5, docs/api.md → Chat → Admin). */
+export interface AdminChat {
+  id: string
+  startedAt: string
+  locale: 'en' | 'ru' | 'uk'
+  outcome: 'booked' | 'found' | 'questions' | 'person' | 'left'
+  messages: number
+  reservationDate: string | null
+}
+
+export interface AdminChatMessage {
+  sender: 'guest' | 'bot'
+  text: string
+  at: string
+}
+
 const STORAGE_KEY = 'linden-admin-session'
 
 interface Session {
@@ -105,5 +121,9 @@ export function useAdminApi() {
       }).then((r) => r.reservation),
 
     addDemo: () => authed<{ created: number }>('/admin/demo-reservations', { method: 'POST' }).then((r) => r.created),
+
+    chats: () => authed<{ chats: AdminChat[] }>('/admin/chats').then((r) => r.chats),
+
+    chat: (id: string) => authed<{ chat: AdminChat, messages: AdminChatMessage[] }>(`/admin/chats/${id}`),
   }
 }

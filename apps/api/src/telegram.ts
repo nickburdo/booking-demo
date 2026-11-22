@@ -58,6 +58,11 @@ export interface TelegramConfig {
   chatId?: string;
 }
 
+/** "Ask a person" from the chat (v5 plan, P7): question and contact, in Ukrainian like ADR-018. */
+export function buildHandoffMessage(d: { question: string; name: string; phone: string }): string {
+  return ["💬 Питання з чату", `«${escapeHtml(d.question)}»`, `${escapeHtml(d.name)} · ${escapeHtml(d.phone)}`].join("\n");
+}
+
 /**
  * Sends a message to the owner's chat. Returns true if Telegram accepted it.
  * Without configuration the message is skipped (local development).

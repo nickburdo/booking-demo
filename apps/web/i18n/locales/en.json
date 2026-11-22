@@ -219,6 +219,70 @@
         "RATE_LIMITED": "Too many requests. Wait a minute and try again.",
         "NETWORK": "No connection to the booking service. Try again."
       }
+    },
+    "tabs": {
+      "label": "Admin sections",
+      "reservations": "Reservations",
+      "chats": "Chats"
+    },
+    "chats": {
+      "metaTitle": "Chats — Linden Coffee admin",
+      "title": "Chats",
+      "lead": "Last 7 days · deleted after that · names and phones hidden",
+      "empty": "No chat conversations in the last 7 days.",
+      "loadError": "Could not load the conversations.",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "messages": "{n} message | {n} messages",
+      "transcript": "Conversation",
+      "guest": "Guest",
+      "bot": "Bot",
+      "bookingLink": "Booking on {date}",
+      "outcome": {
+        "booked": "Booked",
+        "found": "Found a booking",
+        "questions": "Questions",
+        "person": "Asked a person",
+        "left": "Left"
+      }
+    }
+  },
+  "chat": {
+    "launcher": "Chat with us",
+    "title": "Chat with Linden Coffee",
+    "subtitle": "Chat bot · demo",
+    "close": "Close chat",
+    "demoNote": "Demo: this chat is scripted (no AI). Conversations are visible in the public demo admin with names and phones hidden.",
+    "botCheck": "Quick check that you are not a bot:",
+    "startsAfter": "The chat starts right after the check.",
+    "starting": "Starting the chat…",
+    "loading": "Loading the conversation…",
+    "you": "You",
+    "answers": "Answers",
+    "send": "Send",
+    "startNew": "Start a new chat",
+    "ended": {
+      "expired": "This conversation has ended (2 hours without messages).",
+      "limit": "This conversation is too long. Please start a new one."
+    },
+    "errors": {
+      "NETWORK": "No connection. Check your internet and try again.",
+      "RATE_LIMITED": "Too many messages. Wait a minute and try again.",
+      "VERIFICATION_FAILED": "The bot check failed. Please try again.",
+      "VERIFICATION_UNAVAILABLE": "The bot check is unavailable right now. Try again in a minute.",
+      "botCheck": "The bot check could not load. Disable content blockers for this site or try later.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "tabs": {
+      "label": "Chat type",
+      "scripted": "Scripted",
+      "ai": "AI"
+    },
+    "ai": {
+      "title": "Coming soon",
+      "text": "The same chat, but with AI: it will understand free text (\"a table for four tomorrow at 7\") and book through the same rules as the scripted chat and the form.",
+      "note": "Demo roadmap: version 6 of this project. Both chats will stay, so you can compare them.",
+      "toScripted": "Try the scripted chat"
     }
   }
 }

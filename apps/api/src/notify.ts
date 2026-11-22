@@ -2,7 +2,7 @@
 
 import { waitUntil } from "cloudflare:workers";
 import { markNotified, notifiedAt, tableLabel, type ReservationRow } from "./repo";
-import { buildMessage, sendTelegram, type NotificationKind, type TelegramConfig } from "./telegram";
+import { buildHandoffMessage, buildMessage, sendTelegram, type NotificationKind, type TelegramConfig } from "./telegram";
 import { endTime } from "./time";
 
 /**
@@ -59,5 +59,17 @@ export function notifyInBackground(
     notify(db, telegram, kind, row, now).catch((error) => {
       console.error(`Notification (${kind}) for ${row.id} failed:`, error);
     }),
+  );
+}
+
+/** Sends a chat question to the owner after the response (v5 plan, P7); best effort, no DB mark. */
+export function handoffInBackground(telegram: TelegramConfig, data: { question: string; name: string; phone: string }): void {
+  waitUntil(
+    sendTelegram(telegram, buildHandoffMessage(data)).then(
+      (ok) => {
+        if (!ok) console.warn("Chat hand-off message was not delivered");
+      },
+      (error) => console.error("Chat hand-off message failed:", error),
+    ),
   );
 }

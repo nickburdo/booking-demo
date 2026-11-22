@@ -64,6 +64,19 @@ export const loginBody = z.object({
 
 export const adminDayQuery = z.object({ date });
 
+// --- Chat (v5, docs/api.md → Chat) ---
+
+export const chatStartBody = z.object({
+  turnstileToken: z.string().min(1).max(2048),
+  locale: z.enum(["en", "ru", "uk"]),
+});
+
+/** A choice id from the offered options, or text (length is checked by the chat engine). */
+export const chatMessageBody = z.union([
+  z.object({ choice: z.string().min(1).max(100) }).strict(),
+  z.object({ text: z.string().max(2000) }).strict(),
+]);
+
 export const adminCancelBody = z.object({
   reason: z
     .string()
