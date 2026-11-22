@@ -158,3 +158,15 @@ the check passed) creates the conversation; nothing is created by just opening t
 If the check expires before the press, the widget runs it again.
 
 **Done when:** opening the widget and switching tabs create no conversation; pressing Start does.
+
+## Revision R2 (2026-11-22) — the AI says "I don't know" instead of guessing (approved)
+
+**Trigger:** in the live check (5.4) the guest asked "is there oat milk?" and the model answered
+"unfortunately not", although the café facts say nothing about it: the prompt had no rule for a
+question the facts do not answer.
+
+**Decision (user):** one more sentence in the system prompt: if a fact is not listed in the prompt,
+say that you do not know and offer to pass the question to the staff (propose_message_to_cafe). Then
+tests, a commit and a redeploy of the API (the site does not change).
+
+**Done when:** the same question on the live site gets "I don't know, I can pass it to the staff".
