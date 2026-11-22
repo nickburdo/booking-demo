@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1, v2 and v3 implemented, v4 planned** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1–v4 implemented** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -173,7 +173,7 @@ Learned in v3:
 - Two background tasks of one booking are unordered; Date.now() does not advance during I/O
   in Workers, so the wait for the first message counts attempts instead of reading the clock.
 
-## Admin: reservation lifecycle (v4) — planned
+## Admin: reservation lifecycle (v4) — implemented
 
 Plan: `docs/plans/v4-plan.md`. Contract: `docs/api.md` → Admin. Decisions: ADR-020 … ADR-022.
 
@@ -195,3 +195,22 @@ API (`apps/api`):
   `LOGIN_LIMITER`; `ADMIN_USERNAME` var, `ADMIN_PASSWORD` secret.
 - Guest names and phones masked in every admin response; admin actions send no Telegram
   messages.
+- Demo reservations (`POST /admin/demo-reservations`): up to 6 per click through the normal
+  booking code, flagged `is_demo`, no Telegram; at most 20 that have not started yet.
+
+Learned in v4:
+- SQLite cannot change a `CHECK` constraint, so a new status means rebuilding the table. In
+  D1 a migration runs in one transaction with foreign keys always on; `PRAGMA
+  defer_foreign_keys = on` lets the old table be dropped and the new one renamed while
+  `reservation_slots` still points at it. Checked on a copy with real rows before the remote
+  run, after a `wrangler d1 export` backup.
+- `workers.dev` is on the Public Suffix List, so the web and API workers are different sites;
+  a session cookie would be third-party. A bearer token in `sessionStorage` avoids that.
+- A limit on "active" demo data must ignore rows in the past, otherwise data nobody cleans up
+  blocks the feature for good (found in code review).
+- "Has it started?" in the browser must follow a ticking clock, or a page left open shows
+  actions the API already refuses. Tested with Playwright's fake clock — which applies to the
+  whole browser context, so later checks need a fresh context.
+- Vue I18n needs explicit plural rules for Russian and Ukrainian (one / few / many).
+- A public admin demo shapes the product: no messages to guests, masked data, and an honest
+  "demo limitations" note instead of features that would be risky with strangers in the admin.

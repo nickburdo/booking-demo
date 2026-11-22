@@ -10,8 +10,13 @@ export interface Reservation {
   name: string
   phone: string
   comment: string | null
-  status: 'pending' | 'cancelled'
+  status: ReservationStatus
+  /** v4: who cancelled, and the café's optional reason (docs/api.md). */
+  cancelledBy: 'guest' | 'owner' | null
+  cancelReason: string | null
 }
+
+export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'no_show'
 
 export interface NewReservation {
   date: string
@@ -36,6 +41,10 @@ export type ApiErrorCode =
   | 'RATE_LIMITED'
   | 'INTERNAL'
   | 'VERIFICATION_UNAVAILABLE'
+  | 'UNAUTHORIZED'
+  | 'INVALID_CREDENTIALS'
+  | 'NOT_ALLOWED'
+  | 'DEMO_LIMIT'
   | 'NETWORK'
 
 export class ApiError extends Error {
@@ -49,24 +58,26 @@ export class ApiError extends Error {
   }
 }
 
+/** JSON request to the API; any failure becomes an ApiError (shared with useAdminApi). */
+export async function apiRequest<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${base}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json', ...init?.headers },
+    })
+  } catch {
+    throw new ApiError('NETWORK', 'The booking service cannot be reached.')
+  }
+  const body = await res.json().catch(() => null)
+  if (res.ok) return body as T
+  const error = body?.error
+  throw new ApiError(error?.code ?? 'INTERNAL', error?.message ?? `HTTP ${res.status}`, error?.fields ?? {})
+}
+
 export function useBookingApi() {
   const base = useRuntimeConfig().public.apiBase as string
-
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    let res: Response
-    try {
-      res = await fetch(`${base}${path}`, {
-        ...init,
-        headers: { 'content-type': 'application/json', ...init?.headers },
-      })
-    } catch {
-      throw new ApiError('NETWORK', 'The booking service cannot be reached.')
-    }
-    const body = await res.json().catch(() => null)
-    if (res.ok) return body as T
-    const error = body?.error
-    throw new ApiError(error?.code ?? 'INTERNAL', error?.message ?? `HTTP ${res.status}`, error?.fields ?? {})
-  }
+  const request = <T>(path: string, init?: RequestInit) => apiRequest<T>(base, path, init)
 
   return {
     availability: (date: string, guests: number) =>

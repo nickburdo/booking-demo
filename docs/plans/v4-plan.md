@@ -1,6 +1,6 @@
 # v4 plan — Admin: reservation lifecycle
 
-- **Status:** Approved (2026-11-21) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R2
 - **Scope:** stage v4 of the roadmap (`docs/overview.md`): an admin area on the website where the
   owner sees reservations day by day and confirms, cancels (optionally with a reason) or marks
   "no-show". New statuses `confirmed` and `no_show`. A public **demo login** so that portfolio
@@ -155,3 +155,41 @@
 ### 6.2 README (status, admin demo credentials, setup), `docs/architecture.md` (v4 implemented,
   learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Revision R1 (2026-11-22) — demo limitations made visible (approved)
+
+**Trigger:** in 5.4 the user checked the guest side live and found that a guest gets no
+feedback when the café confirms or cancels, and cannot find a booking without the link. Guest
+notifications and booking lookup were discussed and **not** built: with a public admin, any
+visitor could trigger messages to real guests, a bot cannot write to a `@username`, and a lookup
+by phone alone would expose other people's bookings. Instead the demo states its limits.
+Also found in 5.4: demo reservations show "⚠ Telegram not delivered", although they never
+notify by design (ADR-021).
+
+**Decision (user):**
+- R1.1 `AdminReservationRow.vue`: no "Telegram not delivered" warning on demo reservations.
+- R1.2 A one-line demo note (EN/RU/UK) in the booking confirmation and on the reservation page
+  while the booking is waiting: a real café would send an SMS or messenger message; here the
+  guest opens the link again to see the status.
+- R1.3 README section "Demo limitations" (done in 6.2): no guest notifications, lookup only by
+  link, open admin with masked data, Telegram only for the owner — each with how a real project
+  solves it.
+
+**Done when:** R1.1–R1.2 checked on the built site; R1.3 in the README.
+
+## Revision R2 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v4-admin` found three issues; all confirmed in
+the code.
+
+**Decision (user):**
+- R2.1 The demo limit counted demo reservations that are already in the past (nothing moves
+  them to a final status), so "Add demo reservations" would stay blocked for good. Now only
+  live demo reservations that have not started (Kyiv time) count. Test added.
+- R2.2 "Has it started?" in the admin rows and on the guest page was computed once, so actions
+  did not switch at the start time on a page left open. A shared Kyiv clock (`useKyivClock`)
+  ticks every 30 s.
+- R2.3 A code comment in `i18n.config.ts` contained Ukrainian words; rewritten in English.
+
+**Done when:** API tests and typecheck green; R2.2 checked on the built site; API and web
+redeployed (ask first).

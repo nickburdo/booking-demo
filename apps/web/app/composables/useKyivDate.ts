@@ -30,6 +30,23 @@ export function kyivTimeNow(now: Date = new Date()): string {
   }).format(now)
 }
 
+/**
+ * Kyiv wall clock as "YYYY-MM-DD HH:MM", refreshed every 30 s while the component is mounted,
+ * so "has it started?" checks follow the clock on a page left open (v4 R2.2). Compare it with
+ * `${date} ${time}` of a reservation.
+ */
+export function useKyivClock() {
+  const stamp = () => `${kyivToday()} ${kyivTimeNow()}`
+  const now = ref(stamp())
+  let timer: ReturnType<typeof setInterval> | undefined
+  onMounted(() => {
+    now.value = stamp()
+    timer = setInterval(() => (now.value = stamp()), 30_000)
+  })
+  onBeforeUnmount(() => clearInterval(timer))
+  return now
+}
+
 /** "Sat, 5 December" in the page language; the date is a calendar date (no time zone shift). */
 export function useFormatDate() {
   const { locale, locales } = useI18n()

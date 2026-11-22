@@ -55,6 +55,24 @@ export const reservationBody = z.object({
 
 export type ReservationInput = z.output<typeof reservationBody>;
 
+// --- Admin (v4, docs/api.md → Admin) ---
+
+export const loginBody = z.object({
+  username: z.string().min(1).max(100),
+  password: z.string().min(1).max(200),
+});
+
+export const adminDayQuery = z.object({ date });
+
+export const adminCancelBody = z.object({
+  reason: z
+    .string()
+    .trim()
+    .max(200)
+    .nullish()
+    .transform((v) => (v ? v : null)),
+});
+
 /** Parses input or throws a 400 VALIDATION HttpError with one message per field. */
 export function parse<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
   const result = schema.safeParse(input);

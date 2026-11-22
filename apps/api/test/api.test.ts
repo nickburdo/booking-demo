@@ -77,6 +77,8 @@ describe("POST /reservations", () => {
       phone: "+380671234567",
       comment: "Window seat",
       status: "pending",
+      cancelledBy: null,
+      cancelReason: null,
     });
     expect(body.reservation).not.toHaveProperty("table_id");
 

@@ -17,6 +17,7 @@ export default defineConfig({
             TURNSTILE_SECRET: "test-turnstile-secret",
             TELEGRAM_BOT_TOKEN: "test-bot-token",
             TELEGRAM_CHAT_ID: "42",
+            ADMIN_PASSWORD: "test-admin-password",
           },
         },
       };

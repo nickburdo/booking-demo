@@ -2,6 +2,7 @@
 
 import { HttpError } from "./errors";
 import {
+  ACTIVE_STATUSES,
   cancelReservation,
   findByTokenHash,
   findFreeTables,
@@ -26,6 +27,9 @@ export interface ReservationDto {
   phone: string;
   comment: string | null;
   status: ReservationRow["status"];
+  /** v4: who cancelled, and the café's optional reason (docs/api.md). */
+  cancelledBy: ReservationRow["cancelled_by"];
+  cancelReason: string | null;
 }
 
 export function toDto(row: ReservationRow): ReservationDto {
@@ -39,6 +43,8 @@ export function toDto(row: ReservationRow): ReservationDto {
     phone: row.phone,
     comment: row.comment,
     status: row.status,
+    cancelledBy: row.cancelled_by,
+    cancelReason: row.cancel_reason,
   };
 }
 
@@ -63,6 +69,7 @@ export async function createReservation(
   db: D1Database,
   input: ReservationInput,
   now: Date,
+  options: { demo?: boolean } = {},
 ): Promise<{ reservation: ReservationDto; token: string; row: ReservationRow }> {
   if (!isStartBookable(input.date, input.time, now)) {
     throw new HttpError(
@@ -88,6 +95,11 @@ export async function createReservation(
     cancelled_at: null,
     notified_at: null,
     cancel_notified_at: null,
+    confirmed_at: null,
+    no_show_at: null,
+    cancelled_by: null,
+    cancel_reason: null,
+    is_demo: options.demo ? 1 : 0,
   };
 
   // Try free tables smallest-first. A conflict means another request took that table
@@ -124,12 +136,18 @@ export async function cancelByToken(
     "NOT_CANCELLABLE",
     "This reservation is already cancelled or has already started.",
   );
-  if (row.status !== "pending" || minutesUntil(row.date, row.start_time, now) <= 0) {
+  // pending and (from v4) confirmed, before the start (ADR-022).
+  if (!ACTIVE_STATUSES.includes(row.status) || minutesUntil(row.date, row.start_time, now) <= 0) {
     throw notCancellable;
   }
   const cancelledAt = now.toISOString();
-  if (!(await cancelReservation(db, row.id, cancelledAt))) throw notCancellable;
-  const cancelled: ReservationRow = { ...row, status: "cancelled", cancelled_at: cancelledAt };
+  if (!(await cancelReservation(db, row.id, cancelledAt, "guest"))) throw notCancellable;
+  const cancelled: ReservationRow = {
+    ...row,
+    status: "cancelled",
+    cancelled_at: cancelledAt,
+    cancelled_by: "guest",
+  };
   return { reservation: toDto(cancelled), row: cancelled };
 }
 
