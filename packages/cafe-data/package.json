@@ -1,0 +1,10 @@
+{
+  "name": "@booking-demo/cafe-data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Linden Coffee content (name, address, hours, menu) shared by the site and the API (ADR-025)",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

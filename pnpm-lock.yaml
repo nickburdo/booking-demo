@@ -10,6 +10,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@booking-demo/cafe-data':
+        specifier: workspace:*
+        version: link:../../packages/cafe-data
       cors:
         specifier: 2.8.6
         version: 2.8.6
@@ -44,6 +47,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@booking-demo/cafe-data':
+        specifier: workspace:*
+        version: link:../../packages/cafe-data
       '@fontsource-variable/golos-text':
         specifier: 5.3.0
         version: 5.3.0
@@ -78,6 +84,8 @@ importers:
       wrangler:
         specifier: ^4.165.0
         version: 4.165.0(@types/node@26.6.6)(vitest@5.1.1(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)))
+
+  packages/cafe-data: {}
 
 packages:
 

@@ -27,6 +27,12 @@
       "name": "LOGIN_LIMITER",
       "namespace_id": "2002",
       "simple": { "limit": 10, "period": 60 }
+    },
+    // Chat messages: 30 per 60 s per client IP (v5 plan, P6).
+    {
+      "name": "CHAT_LIMITER",
+      "namespace_id": "2003",
+      "simple": { "limit": 30, "period": 60 }
     }
   ]
 }
