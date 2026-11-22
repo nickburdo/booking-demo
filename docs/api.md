@@ -1,8 +1,8 @@
 # Booking API
 
-Status: **v2–v4 — implemented** (2026-11-22); **v5 changes planned** (`docs/plans/v5-plan.md`):
-the [chat endpoints](#chat-v5) and the admin chat list. Examples below are real responses from
-the live v2 API (the example reservation was cancelled afterwards).
+Status: **v2–v5 — implemented** (2026-11-22); **v6 changes planned** (`docs/plans/v6-plan.md`):
+the [AI chat engine](#ai-chat-v6) on the same chat endpoints. Examples below are real responses
+from the live v2 API (the example reservation was cancelled afterwards).
 
 The single backend for every booking interface: the form (v3), the admin (v4) and both chats
 (v5–v6) go through these endpoints and these rules only.
@@ -73,7 +73,7 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 409 | `DEMO_LIMIT` | 20 or more active demo reservations already exist (v4) |
 | 401 | `CHAT_EXPIRED` | Chat request without a valid chat token (missing, unknown or silent for 2 hours) — start a new conversation (v5) |
 | 409 | `CHAT_CONFLICT` | Two chat messages for the same step at once; reload the conversation (v5) |
-| 409 | `CHAT_LIMIT` | The conversation reached 60 guest messages (v5) |
+| 409 | `CHAT_LIMIT` | The conversation reached 60 guest messages (v5; 20 in an AI conversation, v6) |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
 | 429 | `RATE_LIMITED` | Too many create (or, v4, admin login / demo data; v5, chat) requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
@@ -337,13 +337,35 @@ The conversation so far (to continue after a page reload):
 `200 { "messages": [{ "sender": "guest" | "bot", "text": "…" }], "input": { … } }`.
 Errors: `401 CHAT_EXPIRED`.
 
+### AI chat (v6)
+
+`POST /chat/sessions` also takes `"engine": "scripted" | "ai"` (default `"scripted"`). With
+`"ai"` the conversation is run by an open model on Cloudflare Workers AI with tool calling
+(ADR-026); the endpoints, the bot-turn shape, the conversation token and the busy mark stay the
+same.
+
+- The guest writes free text: after an AI turn `input` is `{ "kind": "text", "field": "message", … }`.
+- **Actions need a press.** When the AI proposes a booking, a cancellation or a message to the café,
+  the turn shows a summary and `input` offers `confirm` / `change` choices (plus the text field).
+  Only `{ "choice": "confirm" }` makes the server act — with no model involved — using the same
+  services and rules as everywhere else; `change` returns to the conversation.
+- A reservation link pasted by the guest is looked up by the server; the model sees only a summary
+  and a short booking reference, never the token. Stored transcripts keep links as `#••••`.
+- **Daily free limit.** The AI runs inside Cloudflare's free daily quota. When today's limit is used
+  up (our own neuron budget, or Cloudflare's quota error), the turn says so, points to the scripted
+  chat and has `input: { "kind": "none" }`. The same happens when the model is unavailable.
+- Limits for AI conversations: 20 guest messages (`409 CHAT_LIMIT`), messages up to 500
+  characters, at most 4 model calls per guest message, plus the chat limiter per IP.
+
 ### Admin: `GET /admin/chats` and `GET /admin/chats/:id`
 
 Admin session required (see Admin). The list covers the last 7 days, newest first:
-`{ "chats": [{ "id", "startedAt", "locale", "outcome": "booked" | "found" | "questions" | "person" | "left", "messages": 12 }] }`.
+`{ "chats": [{ "id", "startedAt", "locale", "engine": "scripted" | "ai", "outcome": "booked" | "found" | "questions" | "person" | "left", "messages": 12 }] }`
+(v6: `engine`; `?engine=ai` or `?engine=scripted` filters the list).
 A transcript: `{ "chat": { …list fields, "reservationDate": "2026-12-05" | null }, "messages": [{ "sender", "text", "at" }] }`
 — the guest's name and phone answers are masked like reservations; other text is shown as
-written. Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
+written. In AI transcripts (v6) the names from proposals and any phone-number-like text are masked,
+because the guest can type them anywhere. Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
 `404 NOT_FOUND`.
 
 ## How double booking is prevented

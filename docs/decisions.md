@@ -273,3 +273,37 @@ has confirmed it in discussion.
 - **Consequences:** One place to change café content in code. Both bundlers (Vite for Nuxt,
   esbuild for Wrangler) compile the package from source.
 
+## ADR-026 — AI chat on Cloudflare Workers AI with propose-then-confirm tools
+
+- **Status:** Accepted (2026-11-22, v6 plan); the model is chosen in v6 step 1.3
+- **Context:** The roadmap's AI chat must book through the same validated backend as every other
+  interface (anti-goal in `docs/overview.md`). The demo is public and should cost nothing; the
+  Anthropic API requires buying credits before the first call.
+- **Decision:** The AI engine runs in our API next to the scripted one (ADR-023) and calls an open
+  model with tool calling through the Workers AI binding (`env.AI.run`), behind one adapter that
+  normalises the models' response shapes. Café facts come from `packages/cafe-data` in a compact
+  system prompt. Tools either read (`check_availability`) or **propose** (a booking, a cancellation,
+  a message to the café); a proposal is shown as a summary with "Confirm / Change", and only the
+  guest's press runs the real service, without the model. Tool arguments are validated by our
+  schemas. Reservation tokens never reach the model or the database: pasted links are resolved by
+  the server, the model sees a summary and a booking reference.
+- **Alternatives rejected:** Claude Haiku via the Anthropic API (paid credits up front); Managed
+  Agents (hosting and billing overhead for a short chat whose tools live in our database); letting
+  the model call booking services directly (it could be talked into actions or make mistakes).
+- **Consequences:** Open models are weaker at tools and at Russian / Ukrainian than frontier models;
+  the confirm gate keeps their mistakes harmless, and the model can be swapped by configuration.
+  Cloudflare does not train on or keep Workers AI requests.
+
+## ADR-027 — AI cost: free quota, neuron budget, limits
+
+- **Status:** Accepted (2026-11-22, v6 plan)
+- **Decision:** The account stays on the Workers Free plan, so Workers AI usage above the free
+  10,000 neurons per day is refused, never billed. The API keeps its own daily count (UTC day) in
+  `ai_usage` from the token usage of each response and stops at 9,000 neurons; over it, or on
+  Cloudflare's quota error, the AI tab shows a "daily free limit used up — try the scripted chat"
+  turn. An AI conversation allows 20 guest messages of up to 500 characters and at most 4 model
+  calls per message; replies and history are kept short.
+- **Consequences:** The demo costs nothing; on a busy day the AI tab is unavailable until 00:00 UTC
+  while the scripted chat keeps working. Local development uses the same real quota, because the
+  AI binding always runs on Cloudflare.
+

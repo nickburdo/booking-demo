@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1–v5 implemented** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1–v5 implemented, v6 planned** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -17,7 +17,7 @@ Browser
         ├── D1 (SQLite) — tables, slots, reservations  ── v2
         ├── Telegram Bot API — owner notifications     ── v3
         ├── Cloudflare Turnstile — bot check on create  ── v3
-        ├── LLM provider — AI chat tool calls          ── v6
+        ├── Cloudflare Workers AI — AI chat tool calls ── v6
         └── Payment provider (test mode)               ── v7
 ```
 
@@ -246,4 +246,15 @@ Learned in v5:
   Cyrillic words.
 - `wrangler dev` exposes a local D1 explorer API (`/cdn-cgi/local/explorer/api/d1/…/raw`), handy
   for preparing states in browser tests (e.g. an expired conversation).
+
+## AI chat (v6) — planned
+
+Plan: `docs/plans/v6-plan.md`. Contract: `docs/api.md` → AI chat. Decisions: ADR-026, ADR-027.
+
+- API: `src/chat/ai/` — model adapter over the Workers AI binding `AI`, system prompt from
+  `packages/cafe-data`, tools (check availability; propose booking / cancellation / message to the
+  café), the AI engine next to the scripted one with the same bot turns; migration `0006`
+  (`chat_sessions.engine`, `ai_usage`); daily neuron budget.
+- Web: the chat widget's AI tab runs its own conversation; admin chats show the engine and filter
+  by it.
 

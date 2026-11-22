@@ -173,3 +173,13 @@ password is **not a secret**: the login page shows it.
 
 To close the demo later, put a different, private password with the same command and remove
 the demo hint from the login page.
+
+## 7. AI chat (v6)
+
+Nothing to set up: the AI chat uses Cloudflare Workers AI through the `AI` binding in
+`apps/api/wrangler.jsonc`, on the same Cloudflare account and free plan (10,000 neurons per day,
+no card). Usage is visible in the Cloudflare dashboard under **AI → Workers AI**.
+
+Local `wrangler dev` also calls the real models on Cloudflare (the binding always runs remotely),
+so local tries use the same daily free quota. Automated tests never call the models.
+
