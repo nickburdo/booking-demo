@@ -154,6 +154,31 @@ Checked widths in step 6.1: 375, 768, 1280.
   booking"), "Cancelled by the café" (grey pill + the reason), "Marked as no-show" (pale red
   pill); "Cancel booking" also for confirmed bookings.
 
+- **Chat widget (v5, mockup approved in v5 step 3.1), landing page only:**
+  - **Launcher:** cobalt pill in the bottom-right corner (56px tall, white chat icon + "Chat
+    with us", fully rounded, soft shadow); hidden while the panel is open.
+  - **Panel:** 380 × 600px milk card, radius 16px, soft shadow, above the page in the corner;
+    full screen below `md`. Espresso header with "Linden Coffee" (Unbounded 700 16px), a small
+    "Chat bot · demo" line and a close button (outline on espresso). Esc closes.
+  - **Start screen:** demo note, "Quick check that you're not a bot", the Turnstile widget.
+  - **Messages:** bot = white bubble with a 1px `line` border (tail corner bottom-left); guest =
+    espresso bubble with milk text, right-aligned (tail bottom-right); 15.5px text, line breaks
+    kept; links in cobalt. Demo notes from the bot = dashed `line` border, steam text. "…" while
+    waiting.
+  - **Inputs:** choices as chips under the messages — main ones white with a 2px cobalt border
+    and cobalt text (fully rounded), secondary ones ("Main menu", "Skip", "Another day") with a
+    `line` border and espresso text; free times as square chips (radius 10px), like the
+    booking form. Text input: white field with a 2px `line` border + square cobalt send button,
+    quick chips above it.
+  - **Errors:** box with a 4px `error` left border inside the messages; an ended conversation
+    shows a note and "Start a new chat".
+- **Admin "Chats" (v5):** tabs "Reservations | Chats" under the admin header (active tab
+  underlined in linden). List of the last 7 days (time, language tag, message count, outcome
+  pill: booked = linden, asked a person = pale blue `#DFE6FB` / `#1F3A8F`, found a booking =
+  white with espresso border, questions = `line` grey, left = dashed); the selected row is
+  white. Transcript on the right (below the list on narrow screens) in a white card with the same
+  bubbles (bot bubbles on milk), a link to the booking's day.
+
 ## 7. Section order
 
 1. Header (brand, nav, language switcher, "Book a table")
