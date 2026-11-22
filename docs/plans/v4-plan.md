@@ -1,6 +1,6 @@
 # v4 plan — Admin: reservation lifecycle
 
-- **Status:** Approved (2026-11-21) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R2
 - **Scope:** stage v4 of the roadmap (`docs/overview.md`): an admin area on the website where the
   owner sees reservations day by day and confirms, cancels (optionally with a reason) or marks
   "no-show". New statuses `confirmed` and `no_show`. A public **demo login** so that portfolio

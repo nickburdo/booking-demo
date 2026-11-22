@@ -20,6 +20,24 @@ v3 is live: the booking form on the site (date and guests → free times → con
 private reservation page to view or cancel a booking, Telegram messages to the owner about
 new and cancelled bookings, and a Cloudflare Turnstile bot check on booking.
 
+v4 is live: an admin area at [/admin](https://booking-demo-web.nick-burdo.workers.dev/admin/login)
+where the café sees reservations day by day and confirms, cancels (with an optional reason
+for the guest) or marks a no-show. The guest's reservation page shows what the café did.
+**Try it:** the admin is a public demo — username `demo`, password `linden-demo` (also shown
+on the login page). Guest names and phones are partly hidden there, and a button adds
+made-up demo reservations.
+
+## Demo limitations
+
+This is a demo, so some things a real booking service would do are left out on purpose:
+
+| In this demo | In a real project |
+|---|---|
+| The guest gets **no message** when the café confirms or cancels; the status is shown on the reservation page (open the link again) | An SMS or e-mail, or a Telegram bot the guest starts from a link in the confirmation (a bot cannot write to a `@username` on its own) |
+| A booking can be found **only by its private link** | A guest account, or a lookup by phone confirmed with an SMS code — a lookup by phone alone would show other people's bookings |
+| The **admin is open to everyone** (demo login) and shows guest data masked; anyone can confirm or cancel | A private login for the staff only, who see full guest details |
+| **Telegram messages go only to the owner** (new and cancelled bookings), not for admin actions | Messages for the staff on every change, and to guests if they opted in |
+
 ## Roadmap
 
 | Version | Scope | Status |
@@ -27,7 +45,7 @@ new and cancelled bookings, and a Cloudflare Turnstile bot check on booking.
 | v1 | Landing: menu, hours, map, EN/RU/UK, responsive, deployed | ✅ Done |
 | v2 | API + database: tables, slots, reservations, double-booking protection | ✅ Done |
 | v3 | Booking form + Telegram notification to the owner | ✅ Done |
-| v4 | Admin: list reservations, confirm/cancel | Planned |
+| v4 | Admin: list reservations, confirm/cancel | ✅ Done |
 | v5 | Scripted chat (no AI) on the same API | Planned |
 | v6 | AI chat calling the same API via tool calls | Planned |
 | v7 | Prepayment in a payment provider's test mode | Planned |
@@ -50,14 +68,14 @@ new and cancelled bookings, and a Cloudflare Turnstile bot check on booking.
 
 ```
 apps/
-  web/        Nuxt site: landing (v1), booking form and reservation page (v3)
-  api/        Express booking API on Workers + D1 (v2), Telegram + Turnstile (v3)
+  web/        Nuxt site: landing (v1), booking form and reservation page (v3), admin (v4)
+  api/        Express booking API on Workers + D1 (v2), Telegram + Turnstile (v3), admin API (v4)
 docs/
   overview.md       goals and roadmap
   api.md            booking API contract and examples
   architecture.md   components and what exists now
   decisions.md      architecture decision records
-  setup-integrations.md  one-time Telegram bot and Turnstile setup
+  setup-integrations.md  one-time Telegram bot, Turnstile and admin password setup
   design.md         visual design: palette, type, layout
   cafe.md           the fictional coffee shop's content
   plans/            one implementation plan per version
@@ -110,8 +128,9 @@ pnpm --filter web generate:local       # same, with the local values from .env.l
 ## Deploy
 
 Requires a Cloudflare account and `wrangler login` (run once, from `apps/web`).
-Before the first v3 deploy, create the Telegram bot and the Turnstile widget and store the
-three API secrets: [docs/setup-integrations.md](docs/setup-integrations.md).
+Before the first deploy, create the Telegram bot and the Turnstile widget and store the API
+secrets (`TURNSTILE_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`):
+[docs/setup-integrations.md](docs/setup-integrations.md).
 
 ```sh
 pnpm deploy       # web: nuxt generate + wrangler deploy
