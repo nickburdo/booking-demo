@@ -1,11 +1,12 @@
 // Chat use cases for the HTTP layer (v5): start, reply, history, and the admin views.
 // Ties together the engine, storage and the booking services. HTTP-agnostic; throws HttpError.
 
-import { cancelByToken, createReservation, getAvailability, getReservation } from "../booking";
+import { cancelByIdAsGuest, cancelByToken, createReservation, getAvailability, getReservation } from "../booking";
 import { HttpError } from "../errors";
 import { maskName, maskPhone } from "../mask";
 import { generateToken, hashToken } from "../token";
 import { normalisePhone } from "../validation";
+import { AI_BUSY_MS, AI_MAX_GUEST_MESSAGES, TOKEN_CANDIDATES, handleAi, startAi, type AiState } from "./ai/engine";
 import { checkInput, handle, start, tokenFromLink } from "./engine";
 import {
   CHAT_RETENTION_DAYS,
@@ -17,6 +18,7 @@ import {
   listMessages,
   releaseStep,
   saveTurn,
+  type ChatEngine,
   type ChatListRow,
   type ChatSessionRow,
   type NewMessage,
@@ -47,14 +49,17 @@ export async function startChat(
   locale: Locale,
   siteUrl: string,
   now: Date,
+  engine: ChatEngine = "scripted",
 ): Promise<{ token: string; turn: Turn }> {
   const ctx: ChatContext = { locale, now, siteUrl, services: bookingServices(db, now) };
-  const { state, turn } = start(ctx);
+  // The AI greeting is fixed text: starting a conversation costs no neurons (ADR-027).
+  const { state, turn } = engine === "ai" ? startAi(locale) : start(ctx);
   const token = generateToken();
   await createSession(db, {
     id: crypto.randomUUID(),
     tokenHash: await hashToken(token),
     locale,
+    engine,
     state,
     messages: botMessages(turn),
     now,
@@ -78,15 +83,16 @@ export async function replyToChat(
   services: ChatServices = bookingServices(db, now),
 ): Promise<{ turn: Turn; effects: Effects }> {
   const row = await liveSession(db, token, now);
-  if (row.guest_messages >= MAX_GUEST_MESSAGES) {
+  if (row.guest_messages >= (row.engine === "ai" ? AI_MAX_GUEST_MESSAGES : MAX_GUEST_MESSAGES)) {
     throw new HttpError(409, "CHAT_LIMIT", "This conversation is too long. Start a new one.");
   }
-  const { busySince, ...state } = JSON.parse(row.state) as ChatState;
+  const { busySince, ...state } = JSON.parse(row.state) as ChatState | AiState;
   const conflict = () =>
     new HttpError(409, "CHAT_CONFLICT", "Another message for this step is being handled. Reload the conversation.");
-  // Another request is working on this step (v5 R2.2). A mark older than BUSY_MS is from a request
-  // that died half-way and no longer blocks the conversation.
-  if (busySince && now.getTime() - Date.parse(busySince) < BUSY_MS) throw conflict();
+  // Another request is working on this step (v5 R2.2). A mark older than BUSY_MS (AI: AI_BUSY_MS,
+  // v6 R3.3) is from a request that died half-way and no longer blocks the conversation.
+  const busyMs = row.engine === "ai" ? AI_BUSY_MS : BUSY_MS;
+  if (busySince && now.getTime() - Date.parse(busySince) < busyMs) throw conflict();
 
   const guest = checkInput(state.awaiting, input);
   if (!guest) throw new HttpError(400, "VALIDATION", "This answer does not fit the current question.");
@@ -95,9 +101,16 @@ export async function replyToChat(
   if (!(await claimStep(db, row.id, row.version, { ...state, busySince: now.toISOString() }))) throw conflict();
 
   const ctx: ChatContext = { locale: row.locale, now, siteUrl, services };
-  let result: Awaited<ReturnType<typeof handle>>;
+  let result: { state: object; turn: Turn; effects: Effects };
   try {
-    result = await handle(ctx, state, input);
+    result =
+      row.engine === "ai"
+        ? await handleAi(
+            { db, locale: row.locale, now, siteUrl, services: { ...services, cancelById: (id: string) => cancelByIdAsGuest(db, id, now) } },
+            state as AiState,
+            input,
+          )
+        : await handle(ctx, state as ChatState, input);
   } catch (error) {
     await releaseStep(db, row.id, state).catch(() => {}); // best effort; the mark expires anyway
     throw error;
@@ -133,8 +146,11 @@ export const BUSY_MS = 30_000;
 /** Replaces reservation tokens with "••••" in text that is stored (v5 R2.1). */
 export function redactTokens(text: string, field: string | null): string {
   const masked = text.replace(/#[A-Za-z0-9_-]{20,100}/g, "#••••");
-  // A bare token pasted as the "link" answer.
-  return field === "link" && tokenFromLink(masked) ? "••••" : masked;
+  // A bare token pasted as the "link" answer (scripted).
+  if (field === "link") return tokenFromLink(masked) ? "••••" : masked;
+  // AI chat: every bare token the engine would resolve, anywhere in the message (v6 R3.1).
+  if (field === "message") return masked.replace(TOKEN_CANDIDATES, (m) => (tokenFromLink(m) ? "••••" : m));
+  return masked;
 }
 
 export async function chatHistory(
@@ -144,7 +160,7 @@ export async function chatHistory(
 ): Promise<{ messages: { sender: "guest" | "bot"; text: string }[]; input: Input }> {
   const row = await liveSession(db, token, now);
   const messages = (await listMessages(db, row.id)).map((m) => ({ sender: m.sender, text: m.text }));
-  return { messages, input: (JSON.parse(row.state) as ChatState).awaiting };
+  return { messages, input: (JSON.parse(row.state) as ChatState | AiState).awaiting };
 }
 
 // --- Admin (ADR-024): masked transcripts of the last 7 days ----------------------------------
@@ -154,15 +170,16 @@ function toAdminChat(row: ChatListRow) {
     id: row.id,
     startedAt: row.created_at,
     locale: row.locale,
+    engine: row.engine,
     outcome: row.outcome,
     messages: row.message_count,
     reservationDate: row.reservation_date,
   };
 }
 
-export async function adminChatList(db: D1Database, now: Date) {
+export async function adminChatList(db: D1Database, now: Date, engine?: ChatEngine) {
   const since = new Date(now.getTime() - CHAT_RETENTION_DAYS * 86_400_000).toISOString();
-  return (await listChats(db, since)).map(toAdminChat);
+  return (await listChats(db, since, engine)).map(toAdminChat);
 }
 
 /**
@@ -197,8 +214,57 @@ export async function adminChatTranscript(db: D1Database, id: string) {
     return m.text;
   };
 
+  if (chat.engine === "ai") {
+    // v6 P10: in free text the guest can write a name or a phone anywhere. Names come from the
+    // AI's proposals; anything that looks like a phone number is masked in every message.
+    const aiNames = proposalNames(JSON.parse(chat.state) as AiState);
+    return {
+      chat: toAdminChat(chat),
+      messages: rows.map((m) => ({ sender: m.sender, text: maskPhoneLike(maskWholeWords(m.text, aiNames)), at: m.created_at })),
+    };
+  }
+
   return {
     chat: toAdminChat(chat),
     messages: rows.map((m) => ({ sender: m.sender, text: shown(m), at: m.created_at })),
   };
+}
+
+/** Names the AI put into proposals (from the tool calls kept in the conversation state). */
+function proposalNames(state: AiState): string[] {
+  const names = new Set<string>();
+  for (const message of state.history ?? []) {
+    if (message.role !== "assistant" || !message.tool_calls) continue;
+    for (const call of message.tool_calls) {
+      try {
+        const name = (JSON.parse(call.function.arguments) as { name?: unknown }).name;
+        if (typeof name === "string" && name.trim().length >= 2) names.add(name.trim());
+      } catch {
+        // malformed arguments: nothing to mask
+      }
+    }
+  }
+  return [...names];
+}
+
+/** Replaces each name only as a whole word, so "Al" does not change "Already" (v6 R3.7). */
+export function maskWholeWords(text: string, names: string[]): string {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [...names]
+    .sort((a, b) => b.length - a.length)
+    .reduce((acc, name) => acc.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, "gu"), maskName(name)), text);
+}
+
+/** Masks phone-like sequences (8+ digits with spaces, dashes or brackets) in free text. */
+export function maskPhoneLike(text: string): string {
+  return text.replace(/\+?\d[\d\s\-()]{6,}\d/g, (match) => {
+    const digits = match.replace(/\D/g, "");
+    if (digits.length < 8) return match;
+    // Dates like 2026-11-27 have eight digits too; they are not phones. What follows a date (a time,
+    // or a phone glued to it) is checked on its own (v6 R3.7).
+    const date = /^\d{4}-\d{2}-\d{2}(?!\d)/.exec(match)?.[0];
+    if (date) return date + maskPhoneLike(match.slice(date.length));
+    const e164 = normalisePhone(match) ?? `+${digits}`;
+    return maskPhone(e164);
+  });
 }

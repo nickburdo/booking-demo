@@ -14,6 +14,7 @@ import type { TelegramConfig } from "./telegram";
 import { verifyTurnstile } from "./turnstile";
 import {
   adminCancelBody,
+  adminChatsQuery,
   adminDayQuery,
   availabilityQuery,
   chatMessageBody,
@@ -100,12 +101,12 @@ function chatToken(header: string | undefined): string | null {
 
 app.post("/chat/sessions", async (req, res) => {
   await limitChat(req.get("cf-connecting-ip"));
-  const { turnstileToken, locale } = parse(chatStartBody, req.body ?? {});
+  const { turnstileToken, locale, engine } = parse(chatStartBody, req.body ?? {});
   // One bot check per conversation; it also covers bookings made in it (ADR-023).
   const verdict = await verifyTurnstile(env.TURNSTILE_SECRET, turnstileToken, req.get("cf-connecting-ip"));
   if (verdict === "failed") throw new HttpError(400, "VERIFICATION_FAILED", "Bot check failed or expired. Try again.");
   if (verdict === "unavailable") throw new HttpError(503, "VERIFICATION_UNAVAILABLE", "Bot check is unavailable. Try again later.");
-  res.status(201).json(await startChat(env.DB, locale, siteUrl(req.get("origin")), clock.now()));
+  res.status(201).json(await startChat(env.DB, locale, siteUrl(req.get("origin")), clock.now(), engine));
 });
 
 app.post("/chat/sessions/current/messages", async (req, res) => {
@@ -164,8 +165,9 @@ admin.post("/demo-reservations", async (req, res) => {
   res.status(201).json({ created: await addDemoReservations(env.DB, clock.now()) });
 });
 
-admin.get("/chats", async (_req, res) => {
-  res.json({ chats: await adminChatList(env.DB, clock.now()) });
+admin.get("/chats", async (req, res) => {
+  const { engine } = parse(adminChatsQuery, req.query);
+  res.json({ chats: await adminChatList(env.DB, clock.now(), engine) });
 });
 
 admin.get("/chats/:id", async (req, res) => {

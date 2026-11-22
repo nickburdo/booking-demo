@@ -5,6 +5,8 @@
   "compatibility_date": "2026-11-21",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // AI chat (v6, ADR-026): Workers AI models; runs on Cloudflare even in wrangler dev (free quota).
+  "ai": { "binding": "AI" },
   // Admin login (ADR-020). The password is the secret ADMIN_PASSWORD (wrangler secret put).
   "vars": { "ADMIN_USERNAME": "demo" },
   "d1_databases": [

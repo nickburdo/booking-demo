@@ -2,6 +2,9 @@
 // reload in the same tab continues the conversation.
 import { apiRequest } from '~/composables/useBookingApi'
 
+/** "scripted" (v5) or "ai" (v6, ADR-026): which engine runs a conversation. */
+export type ChatEngine = "scripted" | "ai"
+
 export interface ChatOption {
   id: string
   label: string
@@ -22,28 +25,30 @@ export interface ChatMessage {
   text: string
 }
 
-const STORAGE_KEY = 'linden-chat-token'
+// One token per engine; the scripted key stays as in v5, so its conversations survive the update.
+const STORAGE_KEYS: Record<ChatEngine, string> = { scripted: 'linden-chat-token', ai: 'linden-chat-token-ai' }
 
-function readToken(): string | null {
+function readToken(key: string): string | null {
   try {
-    return sessionStorage.getItem(STORAGE_KEY)
+    return sessionStorage.getItem(key)
   } catch {
     return null
   }
 }
 
-function writeToken(token: string | null) {
+function writeToken(key: string, token: string | null) {
   try {
-    if (token) sessionStorage.setItem(STORAGE_KEY, token)
-    else sessionStorage.removeItem(STORAGE_KEY)
+    if (token) sessionStorage.setItem(key, token)
+    else sessionStorage.removeItem(key)
   } catch {
     // Storage blocked: the conversation just will not survive a reload.
   }
 }
 
-export function useChatApi() {
+export function useChatApi(engine: ChatEngine = 'scripted') {
   const base = useRuntimeConfig().public.apiBase as string
-  let token = readToken()
+  const key = STORAGE_KEYS[engine]
+  let token = readToken(key)
 
   const authed = () => ({ authorization: `Bearer ${token}` })
 
@@ -52,16 +57,16 @@ export function useChatApi() {
 
     forget() {
       token = null
-      writeToken(null)
+      writeToken(key, null)
     },
 
     async start(turnstileToken: string, locale: string): Promise<ChatTurn> {
       const body = await apiRequest<{ token: string, turn: ChatTurn }>(base, '/chat/sessions', {
         method: 'POST',
-        body: JSON.stringify({ turnstileToken, locale }),
+        body: JSON.stringify({ turnstileToken, locale, engine }),
       })
       token = body.token
-      writeToken(token)
+      writeToken(key, token)
       return body.turn
     },
 

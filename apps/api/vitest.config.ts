@@ -8,6 +8,9 @@ export default defineConfig({
       const migrations = await readD1Migrations(path.join(import.meta.dirname, "migrations"));
       return {
         wrangler: { configPath: "./wrangler.jsonc" },
+        // Workers AI has no local simulator; tests replace the model call (test/outbound.ts), so no
+        // remote session is opened (v6).
+        remoteBindings: false,
         miniflare: {
           bindings: {
             // Test-only binding: the setup file applies these migrations to the local D1.

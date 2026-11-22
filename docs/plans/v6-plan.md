@@ -1,6 +1,6 @@
 # v6 plan — AI chat next to the scripted one
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R3
 - **Scope:** stage v6 of the roadmap (`docs/overview.md`): the "AI" tab of the chat widget (v5 R1)
   becomes a working AI chat on **Cloudflare Workers AI** (free daily quota, no new account). An
   open model with tool calling understands free text and uses **tools** that call the same booking
@@ -126,3 +126,109 @@
 ### 6.2 README (AI chat on Workers AI, demo limitations: daily free limit, open model can make
   mistakes), `docs/architecture.md` (v6 implemented, learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Step 1.3 result (2026-11-22) — model trial
+
+Same 8 scripted conversations (EN/RU/UK) per model, dry tools, about 2,100 neurons in total
+(`apps/api/scripts/model-trial/`, local only). Corrected for a trial bug (the expected "tomorrow" was
+computed at Worker start, when the Workers clock reads 1970).
+
+| Model | Passed | Main problems | Neurons / 8 conversations |
+|---|---|---|---|
+| `@cf/openai/gpt-oss-120b` | 7 / 8 | asked which Saturday (a fair clarification) | ~530 |
+| `@cf/openai/gpt-oss-20b` | 6 / 8 | wrote a tool call as JSON text; skipped the availability check | ~290 |
+| `@cf/meta/llama-4-scout-17b-16e-instruct` | 6 / 8 | made up free times, wrong "tomorrow", proposed 10 guests | ~540 |
+| `@cf/mistralai/mistral-small-3.1-24b-instruct` | 6 / 8 | refused an allowed time, wrong Saturday, no proposal | ~490 |
+
+Findings for Phase 2: gpt-oss can leak channel markers into tool names (`propose_booking<|channel|>analysis`)
+— the adapter strips them; all models sometimes say "passed / booked" before the guest confirms — the
+prompt must say so, and the server summary stays the authority.
+
+**Decision (user):** `@cf/openai/gpt-oss-120b` (about 35 real conversations a day within the 9,000-neuron budget).
+
+
+## Revision R1 (2026-11-22) — a conversation starts on the guest's first action (approved)
+
+**Trigger:** in Phase 3 opening the widget started a conversation on the visible tab right after
+the bot check, so a guest who went straight to the other tab left an empty "left" conversation in
+the admin (also true in v5).
+
+**Decision (user):** the start screen keeps the bot check, and a "Start chat" button (enabled once
+the check passed) creates the conversation; nothing is created by just opening the widget or a tab.
+If the check expires before the press, the widget runs it again.
+
+**Done when:** opening the widget and switching tabs create no conversation; pressing Start does.
+
+## Revision R2 (2026-11-22) — the AI says "I don't know" instead of guessing (approved)
+
+**Trigger:** in the live check (5.4) the guest asked "is there oat milk?" and the model answered
+"unfortunately not", although the café facts say nothing about it: the prompt had no rule for a
+question the facts do not answer.
+
+**Decision (user):** one more sentence in the system prompt: if a fact is not listed in the prompt,
+say that you do not know and offer to pass the question to the staff (propose_message_to_cafe). Then
+tests, a commit and a redeploy of the API (the site does not change).
+
+**Done when:** the same question on the live site gets "I don't know, I can pass it to the staff".
+
+## Revision R3 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** the Phase 6.1 review of `main...feature/v6-ai-chat` found 10 confirmed issues (checked
+against the code). Decisions (user): names → an honest demo notice; fix all four minor findings too.
+Every fix is a small in-place change; no architecture changes.
+
+### R3.1 A bare token inside an AI message is stored unredacted (security)
+- `resolveLinks` replaces bare 40–50-char tokens anywhere in the text; `redactTokens` masks only
+  `#token` or a whole-message token, so "please cancel <token> thanks" is stored with the token.
+- Fix: one shared token-candidate regex (exported from `chat/ai/engine.ts`); `redactTokens` for
+  field `"message"` replaces every candidate that `tokenFromLink` accepts with `••••`.
+- Test: a token in the middle of a message is not in the stored transcript.
+
+### R3.2 The 500-character limit is only enforced by the browser
+- Fix: `handleAi` answers a text longer than `AI_MAX_TEXT` with a new `AI_TEXTS.tooLong` (en/ru/uk),
+  keeps `state.awaiting`, makes no model call.
+- Test: a 501-character message → the hint, no model call.
+
+### R3.3 The 30 s busy mark is shorter than an AI turn (up to 4 × 25 s)
+- Fix: the stale threshold depends on the engine: scripted 30 s, AI
+  `MAX_MODEL_CALLS × MODEL_TIMEOUT_MS + 20 s` (120 s).
+- Test: an AI session marked busy 60 s ago → conflict; 130 s ago → the step runs.
+
+### R3.4 History trimming can drop every guest message
+- Fix: `trimmed()` never starts after the latest user message, even past `HISTORY_LIMIT`.
+- Test: a history whose last 12 entries hold no user message keeps the latest user message.
+
+### R3.5 A bare token starting or ending with "-" loses that character
+- Fix: explicit lookarounds `(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40,50}(?![A-Za-z0-9_-])` instead of `\b`.
+- Test: a token starting with "-" is found.
+
+### R3.6 The AI demo notice promises hidden names (decision: honest notice)
+- Names typed in free text cannot be found reliably. The AI notice (server `AI_TEXTS.demoNotice`
+  and web `chat.ai.demoNote`, en/ru/uk) says instead: phones are hidden; please do not write
+  personal details beyond the name and phone a booking needs. Names from proposals stay masked.
+- `docs/api.md` (AI chat → admin) is updated to match.
+
+### R3.7 Masking: date-times look like phones; short names hit other words
+- Fix: `maskPhoneLike` leaves a match that starts with `YYYY-MM-DD` alone; proposal names are replaced
+  only as whole words (Unicode letter/digit lookarounds).
+- Test: "2026-11-27 18:00" stays; the name "Al" does not change "Already".
+
+### R3.8 A timed-out model call is not counted in the budget
+- Fix: on a timeout the engine adds an estimate of one call (`neuronsFor({ input: 2000, output: 600 })`,
+  about 105 neurons); `AiUnavailableError` gets a `timedOut` flag.
+- Test: a timed-out call raises today's neurons by the estimate.
+
+### R3.9 Outcome "found" when a pasted link matched no booking
+- Fix: `any` is true only when a booking was resolved.
+- Test: an unknown link → outcome "questions".
+
+### R3.10 A failed cancellation is offered again
+- Fix: on NOT_CANCELLABLE / NOT_FOUND, mark `found[ref].cancellable = false` and add a history note.
+- Test: after a failed confirm the state marks the booking as not cancellable.
+
+### Steps after the fixes
+1. Tests and typecheck green; one commit.
+2. Deploy the API, then the site (ask before each).
+3. Live check: a token in the middle of a message is masked in the admin; the new notice is shown.
+
+**Done when:** all R3 tests pass and the live check above passes.

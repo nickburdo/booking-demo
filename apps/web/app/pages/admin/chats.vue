@@ -17,6 +17,10 @@ useHead({
 const ready = ref(false)
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const chats = ref<AdminChat[]>([])
+// v6: filter by chat engine (all / scripted / AI); the API filters the list.
+type EngineFilter = 'all' | AdminChat['engine']
+const engineFilter = ref<EngineFilter>('all')
+const ENGINE_FILTERS: EngineFilter[] = ['all', 'scripted', 'ai']
 const selected = ref<AdminChat | null>(null)
 const transcript = ref<AdminChatMessage[]>([])
 const transcriptState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -25,7 +29,7 @@ const transcriptBox = ref<HTMLElement>()
 async function load() {
   state.value = 'loading'
   try {
-    chats.value = await admin.chats()
+    chats.value = await admin.chats(engineFilter.value === 'all' ? undefined : engineFilter.value)
     state.value = 'ready'
     const first = chats.value[0]
     if (first && !selected.value) await open(first, false)
@@ -54,6 +58,12 @@ async function open(chat: AdminChat, focus = true) {
     transcriptState.value = 'error'
   }
 }
+
+watch(engineFilter, () => {
+  selected.value = null
+  transcript.value = []
+  load()
+})
 
 onNuxtReady(() => {
   if (!admin.hasSession()) {
@@ -103,6 +113,19 @@ const isDemoNote = (m: AdminChatMessage) => m.sender === 'bot' && /^(Demo|Дем
           <div>
             <h1 class="font-display text-[26px] font-bold md:text-[30px]">{{ t('admin.chats.title') }}</h1>
             <p class="mt-1 text-[15px] text-steam">{{ t('admin.chats.lead') }}</p>
+            <div class="mt-4 flex flex-wrap gap-2" role="group" :aria-label="t('admin.chats.filter.label')">
+              <button
+                v-for="key in ENGINE_FILTERS"
+                :key="key"
+                type="button"
+                class="inline-flex h-9 items-center rounded-[10px] border-2 px-3 text-sm font-semibold"
+                :class="engineFilter === key ? 'border-espresso bg-espresso text-milk' : 'border-line bg-white'"
+                :aria-pressed="engineFilter === key"
+                @click="engineFilter = key"
+              >
+                {{ t(`admin.chats.filter.${key}`) }}
+              </button>
+            </div>
 
             <p v-if="state === 'loading'" class="mt-6 text-steam">{{ t('admin.day.loading') }}</p>
             <div v-else-if="state === 'error'" class="mt-6" role="alert">
@@ -122,7 +145,7 @@ const isDemoNote = (m: AdminChatMessage) => m.sender === 'bot' && /^(Demo|Дем
                   <span class="text-[15px] tabular-nums">{{ startedLabel(c.startedAt) }}</span>
                   <span class="rounded border border-line px-1 text-center text-xs font-semibold uppercase">{{ c.locale }}</span>
                   <!-- On phones the message count goes to a second line, so long outcome labels fit -->
-                  <span class="order-last w-full text-[15px] text-steam sm:order-none sm:w-auto">{{ t('admin.chats.messages', c.messages) }}</span>
+                  <span class="order-last w-full text-[15px] text-steam sm:order-none sm:w-auto">{{ t(`admin.chats.engine.${c.engine}`) }} · {{ t('admin.chats.messages', c.messages) }}</span>
                   <span class="ml-auto rounded-md px-2 py-0.5 text-[13px] font-semibold sm:ml-0" :class="outcomeClass[c.outcome]">{{ t(`admin.chats.outcome.${c.outcome}`) }}</span>
                 </button>
               </li>
@@ -133,7 +156,7 @@ const isDemoNote = (m: AdminChatMessage) => m.sender === 'bot' && /^(Demo|Дем
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p>
                 <strong>{{ startedLabel(selected.startedAt) }}</strong>
-                <span class="text-[15px] text-steam"> · {{ selected.locale.toUpperCase() }} · {{ t('admin.chats.messages', selected.messages) }}</span>
+                <span class="text-[15px] text-steam"> · {{ selected.locale.toUpperCase() }} · {{ t(`admin.chats.engine.${selected.engine}`) }} · {{ t('admin.chats.messages', selected.messages) }}</span>
               </p>
               <NuxtLink
                 v-if="selected.reservationDate"

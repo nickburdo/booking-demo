@@ -364,8 +364,11 @@ Admin session required (see Admin). The list covers the last 7 days, newest firs
 (v6: `engine`; `?engine=ai` or `?engine=scripted` filters the list).
 A transcript: `{ "chat": { …list fields, "reservationDate": "2026-12-05" | null }, "messages": [{ "sender", "text", "at" }] }`
 — the guest's name and phone answers are masked like reservations; other text is shown as
-written. In AI transcripts (v6) the names from proposals and any phone-number-like text are masked,
-because the guest can type them anywhere. Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
+written. In AI transcripts (v6) the names from proposals (whole words only) and any
+phone-number-like text are masked, because the guest can type them anywhere. A name typed in free
+text that never reaches a proposal cannot be found reliably, so the AI tab's demo notice says that
+phones are hidden and asks for no personal details beyond the name and phone a booking needs
+(v6 R3.6). Reservation tokens written anywhere in an AI message are stored as `••••` (v6 R3.1). Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
 `404 NOT_FOUND`.
 
 ## How double booking is prevented

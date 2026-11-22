@@ -4,6 +4,7 @@ import { HttpError } from "./errors";
 import {
   ACTIVE_STATUSES,
   cancelReservation,
+  findById,
   findByTokenHash,
   findFreeTables,
   insertReservation,
@@ -130,7 +131,28 @@ export async function cancelByToken(
   token: string,
   now: Date,
 ): Promise<{ reservation: ReservationDto; row: ReservationRow }> {
-  const row = await findOrThrow(db, token);
+  return cancelAsGuest(db, await findOrThrow(db, token), now);
+}
+
+/**
+ * Guest cancellation by reservation id, for the AI chat (v6 P4): the guest proved access by pasting
+ * the private link, which the server resolved; the token itself is never kept. Same rules as above.
+ */
+export async function cancelByIdAsGuest(
+  db: D1Database,
+  id: string,
+  now: Date,
+): Promise<{ reservation: ReservationDto; row: ReservationRow }> {
+  const row = await findById(db, id);
+  if (!row) throw new HttpError(404, "NOT_FOUND", "Reservation not found.");
+  return cancelAsGuest(db, row, now);
+}
+
+async function cancelAsGuest(
+  db: D1Database,
+  row: ReservationRow,
+  now: Date,
+): Promise<{ reservation: ReservationDto; row: ReservationRow }> {
   const notCancellable = new HttpError(
     409,
     "NOT_CANCELLABLE",

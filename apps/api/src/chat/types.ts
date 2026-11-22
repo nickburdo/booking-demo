@@ -12,7 +12,7 @@ export interface Option {
   label: string;
 }
 
-export type TextField = "name" | "phone" | "comment" | "link" | "question";
+export type TextField = "name" | "phone" | "comment" | "link" | "question" | "message";
 
 /** What the bot expects next. Text inputs may offer quick options too (e.g. "Skip", "Main menu"). */
 export type Input =

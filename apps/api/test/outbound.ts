@@ -3,6 +3,7 @@
 // also intercepts its calls (v3 plan, R4). Tests change behaviour via `outbound`.
 
 import { beforeEach, vi } from "vitest";
+import { aiModel, type AiMessage, type AiReply } from "../src/chat/ai/model";
 
 export type TurnstileMode = "ok" | "failed" | "http-error" | "network-error";
 export type TelegramMode = "ok" | "failed" | "network-error";
@@ -17,6 +18,12 @@ export const outbound = {
   telegramDelayMs: (_text: string): number => 0,
   /** Texts of Telegram messages in the order their requests finished. */
   telegramDone: [] as string[],
+  /**
+   * v6: scripted model replies, used in order; each call records the messages it got. An empty
+   * script fails the test, so tests never reach the real Workers AI (it has no local simulator).
+   */
+  aiReplies: [] as Array<AiReply | Error>,
+  aiCalls: [] as AiMessage[][],
 };
 
 const realFetch = globalThis.fetch;
@@ -35,6 +42,15 @@ beforeEach(() => {
   outbound.telegramCalls = [];
   outbound.telegramDelayMs = () => 0;
   outbound.telegramDone = [];
+  outbound.aiReplies = [];
+  outbound.aiCalls = [];
+  vi.spyOn(aiModel, "run").mockImplementation(async (messages) => {
+    outbound.aiCalls.push(messages);
+    const next = outbound.aiReplies.shift();
+    if (!next) throw new Error("Unexpected AI model call: no scripted reply left");
+    if (next instanceof Error) throw next;
+    return next;
+  });
 
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);

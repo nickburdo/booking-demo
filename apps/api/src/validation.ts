@@ -69,7 +69,11 @@ export const adminDayQuery = z.object({ date });
 export const chatStartBody = z.object({
   turnstileToken: z.string().min(1).max(2048),
   locale: z.enum(["en", "ru", "uk"]),
+  // v6: which engine runs the conversation (ADR-026); v5 clients send none.
+  engine: z.enum(["scripted", "ai"]).default("scripted"),
 });
+
+export const adminChatsQuery = z.object({ engine: z.enum(["scripted", "ai"]).optional() });
 
 /** A choice id from the offered options, or text (length is checked by the chat engine). */
 export const chatMessageBody = z.union([
