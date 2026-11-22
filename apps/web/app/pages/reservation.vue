@@ -147,6 +147,8 @@ async function cancel() {
             {{ t(`reservation.status.${statusKey}`) }}
           </span>
         </p>
+        <!-- Demo limitation: no messages to guests, the status is only shown here (v4 plan, R1.2) -->
+        <p v-if="reservation.status === 'pending' && !started" class="mt-2 max-w-xl text-[15px] text-steam">{{ t('reservation.demoNote') }}</p>
 
         <dl class="mt-5 grid max-w-xl grid-cols-[auto_1fr] gap-x-6 gap-y-1">
           <dt class="text-steam">{{ t('reservation.when') }}</dt>

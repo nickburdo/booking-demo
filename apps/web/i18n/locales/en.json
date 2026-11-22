@@ -88,7 +88,7 @@
       "linkIntro": "Save this private link — it's the only way to see or cancel your booking:",
       "copy": "Copy link",
       "copied": "Copied",
-      "note": "The coffee shop has been notified. This is a demo — no real table is waiting for you.",
+      "note": "The coffee shop has been notified. This is a demo: no real table is waiting for you, and a real café would also send you an SMS or a messenger message when it confirms or cancels. Here, open your link to see the current status.",
       "another": "Book another table"
     }
   },
@@ -133,7 +133,8 @@
     "confirmedNote": "The café has confirmed your booking. See you!",
     "cancelledByOwnerNote": "The café has cancelled this booking.",
     "reason": "Reason: “{reason}”",
-    "noShowNote": "The café marked that nobody came to this booking."
+    "noShowNote": "The café marked that nobody came to this booking.",
+    "demoNote": "Demo: the café’s answer appears here, so open this link again later. A real café would also send you an SMS or a messenger message."
   },
   "admin": {
     "badge": "Admin demo",

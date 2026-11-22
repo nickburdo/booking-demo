@@ -69,7 +69,8 @@ watch(() => props.reservation.status, () => (panel.value = null))
 
     <div class="text-right lg:text-left max-lg:order-2">
       <span class="inline-block rounded-md px-2 py-0.5 text-[13px] font-semibold text-espresso" :class="pillClass">{{ statusLabel }}</span>
-      <span v-if="live && !reservation.notified" class="mt-1 block text-[13px] text-[#8a5a00]">⚠ {{ t('admin.notNotified') }}</span>
+      <!-- Demo reservations never notify the owner (ADR-021), so no warning for them (v4 R1.1) -->
+      <span v-if="live && !reservation.notified && !reservation.demo" class="mt-1 block text-[13px] text-[#8a5a00]">⚠ {{ t('admin.notNotified') }}</span>
     </div>
 
     <div class="flex flex-wrap items-start gap-2 max-lg:order-4 max-lg:col-span-2 max-lg:mt-1 lg:justify-end">

@@ -239,6 +239,7 @@ const submitLabel = computed(() =>
         {{ copied ? t('booking.success.copied') : t('booking.success.copy') }}
       </button>
     </div>
+    <!-- Includes the demo limitation: no messages to guests (v4 plan, R1.2) -->
     <p class="mt-3 text-[15px] text-milk/70">{{ t('booking.success.note') }}</p>
     <button type="button" class="btn-outline-light mt-4" @click="bookAnother">{{ t('booking.success.another') }}</button>
   </div>
