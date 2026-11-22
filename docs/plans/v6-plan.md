@@ -146,3 +146,15 @@ prompt must say so, and the server summary stays the authority.
 
 **Decision (user):** `@cf/openai/gpt-oss-120b` (about 35 real conversations a day within the 9,000-neuron budget).
 
+
+## Revision R1 (2026-11-22) — a conversation starts on the guest's first action (approved)
+
+**Trigger:** in Phase 3 opening the widget started a conversation on the visible tab right after
+the bot check, so a guest who went straight to the other tab left an empty "left" conversation in
+the admin (also true in v5).
+
+**Decision (user):** the start screen keeps the bot check, and a "Start chat" button (enabled once
+the check passed) creates the conversation; nothing is created by just opening the widget or a tab.
+If the check expires before the press, the widget runs it again.
+
+**Done when:** opening the widget and switching tabs create no conversation; pressing Start does.

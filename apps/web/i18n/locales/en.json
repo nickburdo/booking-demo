@@ -244,6 +244,16 @@
         "questions": "Questions",
         "person": "Asked a person",
         "left": "Left"
+      },
+      "engine": {
+        "scripted": "Scripted",
+        "ai": "AI"
+      },
+      "filter": {
+        "label": "Chat type",
+        "all": "All",
+        "scripted": "Scripted",
+        "ai": "AI"
       }
     }
   },
@@ -254,7 +264,7 @@
     "close": "Close chat",
     "demoNote": "Demo: this chat is scripted (no AI). Conversations are visible in the public demo admin with names and phones hidden.",
     "botCheck": "Quick check that you are not a bot:",
-    "startsAfter": "The chat starts right after the check.",
+    "startsAfter": "The button turns on after the check.",
     "starting": "Starting the chat…",
     "loading": "Loading the conversation…",
     "you": "You",
@@ -279,10 +289,8 @@
       "ai": "AI"
     },
     "ai": {
-      "title": "Coming soon",
-      "text": "The same chat, but with AI: it will understand free text (\"a table for four tomorrow at 7\") and book through the same rules as the scripted chat and the form.",
-      "note": "Demo roadmap: version 6 of this project. Both chats will stay, so you can compare them.",
-      "toScripted": "Try the scripted chat"
-    }
+      "demoNote": "Demo: replies come from an open AI model on Cloudflare and can be wrong. Nothing happens until you press a confirm button. Conversations are visible in the public demo admin with names and phones hidden. The free AI limit is shared by all visitors each day."
+    },
+    "start": "Start chat"
   }
 }

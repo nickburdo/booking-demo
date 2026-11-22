@@ -26,6 +26,8 @@ export interface AdminChat {
   id: string
   startedAt: string
   locale: 'en' | 'ru' | 'uk'
+  /** v6: which chat engine ran the conversation. */
+  engine: 'scripted' | 'ai'
   outcome: 'booked' | 'found' | 'questions' | 'person' | 'left'
   messages: number
   reservationDate: string | null
@@ -122,7 +124,8 @@ export function useAdminApi() {
 
     addDemo: () => authed<{ created: number }>('/admin/demo-reservations', { method: 'POST' }).then((r) => r.created),
 
-    chats: () => authed<{ chats: AdminChat[] }>('/admin/chats').then((r) => r.chats),
+    chats: (engine?: AdminChat['engine']) =>
+      authed<{ chats: AdminChat[] }>(engine ? `/admin/chats?engine=${engine}` : '/admin/chats').then((r) => r.chats),
 
     chat: (id: string) => authed<{ chat: AdminChat, messages: AdminChatMessage[] }>(`/admin/chats/${id}`),
   }
