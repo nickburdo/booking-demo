@@ -130,7 +130,7 @@ const dishName = (id: string, fallback: string) => {
   return name ? localized(name) : fallback
 }
 const orderEuros = computed(() =>
-  order.value ? new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR' }).format(order.value.amount / 100) : '',
+  order.value ? new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' }).format(order.value.amount / 100) : '',
 )
 const orderAmount = computed(() => (order.value ? `${order.value.discounted} ₴ · ${orderEuros.value}` : ''))
 const statusKey = computed(() => {

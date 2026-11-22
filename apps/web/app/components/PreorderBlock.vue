@@ -33,7 +33,7 @@ const cents = computed(() =>
   chosen.value.reduce((sum, i) => sum + Math.round((i.price * (100 - DISCOUNT_PERCENT)) / RATE) * quantities[i.id]!, 0),
 )
 const euros = computed(() =>
-  new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR' }).format(cents.value / 100),
+  new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' }).format(cents.value / 100),
 )
 
 function change(id: string, delta: number) {

@@ -24,7 +24,7 @@ const orderLine = computed(() => {
   const o = props.reservation.order
   if (!o) return ''
   const dishes = o.items.map((i) => `${menuNames.has(i.id) ? localized(menuNames.get(i.id)!) : i.name} × ${i.quantity}`).join(', ')
-  const euros = new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR' }).format(o.amount / 100)
+  const euros = new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'EUR', currencyDisplay: 'narrowSymbol' }).format(o.amount / 100)
   return t('admin.order.line', { dishes, amount: `${o.discounted} ₴ · ${euros}` })
 })
 const orderTag = computed(() => ({
