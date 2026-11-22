@@ -25,6 +25,8 @@ const busyId = ref<string | null>(null)
 const rowErrors = ref<Record<string, string>>({})
 const notice = ref<string | null>(null)
 const demoBusy = ref(false)
+// Ticks every 30 s, so the rows switch actions when a reservation starts (v4 R2.2).
+const kyivNow = useKyivClock()
 
 let requestSeq = 0
 async function load() {
@@ -190,6 +192,7 @@ async function addDemo() {
                 :reservation="r"
                 :busy="busyId === r.id"
                 :error="rowErrors[r.id] ?? null"
+                :now="kyivNow"
                 @act="(action, reason) => act(r, action, reason)"
               />
             </ul>

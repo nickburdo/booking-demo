@@ -8,14 +8,14 @@ import {
   ACTIVE_STATUSES,
   cancelReservation,
   confirmReservation,
-  countActiveDemo,
+  countUpcomingDemo,
   findAdminRow,
   listByDate,
   markNoShow,
   type AdminRow,
   type ReservationStatus,
 } from "./repo";
-import { addDays, endTime, kyivNow, minutesUntil } from "./time";
+import { addDays, endTime, fromMinutes, kyivNow, minutesUntil } from "./time";
 
 /** Reservation as the admin sees it: table label, masked guest data, notification flag. */
 export interface AdminReservationDto {
@@ -140,12 +140,13 @@ function demoPhone(): string {
  * through the normal booking code (same slot guard), flagged as demo. No Telegram.
  */
 export async function addDemoReservations(db: D1Database, now: Date): Promise<number> {
-  const active = await countActiveDemo(db);
+  const kyiv = kyivNow(now);
+  const today = kyiv.date;
+  const active = await countUpcomingDemo(db, today, fromMinutes(kyiv.minutes));
   if (active >= DEMO_MAX_ACTIVE) {
     throw new HttpError(409, "DEMO_LIMIT", `There are already ${active} demo reservations.`);
   }
   const wanted = Math.min(DEMO_BATCH, DEMO_MAX_ACTIVE - active);
-  const today = kyivNow(now).date;
 
   let created = 0;
   for (let attempt = 0; created < wanted && attempt < wanted * 3; attempt++) {

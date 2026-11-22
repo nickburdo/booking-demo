@@ -335,6 +335,18 @@ describe("demo reservations", () => {
     expect(((await fifth.json()) as any).error.code).toBe("DEMO_LIMIT");
   });
 
+  it("does not count demo reservations that are already in the past (R2.1)", async () => {
+    const auth = await token();
+    for (let i = 0; i < 4; i++) await adminCall("/admin/demo-reservations", auth, { method: "POST" });
+    expect((await adminCall("/admin/demo-reservations", auth, { method: "POST" })).status).toBe(409);
+
+    // Four days later every demo reservation has started; none was cancelled or marked.
+    pinClock(new Date(NOW.getTime() + 4 * 24 * 3600_000));
+    const later = await adminCall("/admin/demo-reservations", await token(), { method: "POST" });
+    expect(later.status).toBe(201);
+    expect(((await later.json()) as any).created).toBe(6);
+  });
+
   it("needs a session", async () => {
     expect((await adminCall("/admin/demo-reservations", null, { method: "POST" })).status).toBe(401);
   });

@@ -176,3 +176,20 @@ notify by design (ADR-021).
   solves it.
 
 **Done when:** R1.1–R1.2 checked on the built site; R1.3 in the README.
+
+## Revision R2 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** Phase 6.1 review of `main...feature/v4-admin` found three issues; all confirmed in
+the code.
+
+**Decision (user):**
+- R2.1 The demo limit counted demo reservations that are already in the past (nothing moves
+  them to a final status), so "Add demo reservations" would stay blocked for good. Now only
+  live demo reservations that have not started (Kyiv time) count. Test added.
+- R2.2 "Has it started?" in the admin rows and on the guest page was computed once, so actions
+  did not switch at the start time on a page left open. A shared Kyiv clock (`useKyivClock`)
+  ticks every 30 s.
+- R2.3 A code comment in `i18n.config.ts` contained Ukrainian words; rewritten in English.
+
+**Done when:** API tests and typecheck green; R2.2 checked on the built site; API and web
+redeployed (ask first).

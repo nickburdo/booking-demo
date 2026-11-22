@@ -3,13 +3,14 @@
 // API allows now (ADR-022); the API stays the authority and answers NOT_ALLOWED otherwise.
 import type { AdminAction, AdminReservation } from '~/composables/useAdminApi'
 
-const props = defineProps<{ reservation: AdminReservation, busy: boolean, error: string | null }>()
+// `now`: Kyiv "YYYY-MM-DD HH:MM" from the page's ticking clock (v4 R2.2).
+const props = defineProps<{ reservation: AdminReservation, busy: boolean, error: string | null, now: string }>()
 const emit = defineEmits<{ act: [action: AdminAction, reason?: string] }>()
 
 const { t } = useI18n()
 
 // Kyiv wall-clock comparison, like the guest page.
-const started = computed(() => `${props.reservation.date} ${props.reservation.time}` <= `${kyivToday()} ${kyivTimeNow()}`)
+const started = computed(() => `${props.reservation.date} ${props.reservation.time}` <= props.now)
 const live = computed(() => props.reservation.status === 'pending' || props.reservation.status === 'confirmed')
 const canConfirm = computed(() => props.reservation.status === 'pending' && !started.value)
 const canCancel = computed(() => live.value && !started.value)

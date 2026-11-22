@@ -1,6 +1,6 @@
 // Vue I18n runtime options (loaded by @nuxtjs/i18n from i18n/i18n.config.ts).
-// Russian and Ukrainian have three plural forms: 1 гість, 2 гості, 5 гостей. Messages for them
-// are written as "one | few | many" (v4: admin counts).
+// Russian and Ukrainian have three plural forms (one / few / many, as for 1, 2 and 5 guests).
+// Their messages are written as "one | few | many" (v4: admin counts).
 
 function slavicPlural(choice: number, choicesLength: number): number {
   if (choicesLength < 3) return choice === 1 ? 0 : 1

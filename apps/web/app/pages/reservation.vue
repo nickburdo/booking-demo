@@ -54,10 +54,12 @@ onNuxtReady(() => {
 })
 
 // A booking that has started cannot be cancelled (docs/api.md); compare in Kyiv time.
+// The clock ticks, so the cancel button disappears when the booking starts (v4 R2.2).
+const kyivNow = useKyivClock()
 const started = computed(() => {
   const r = reservation.value
   if (!r) return false
-  return `${r.date} ${r.time}` <= `${kyivToday()} ${kyivTimeNow()}`
+  return `${r.date} ${r.time}` <= kyivNow.value
 })
 // v4: confirmed bookings can be cancelled by the guest too (ADR-022).
 const live = computed(() => reservation.value?.status === 'pending' || reservation.value?.status === 'confirmed')

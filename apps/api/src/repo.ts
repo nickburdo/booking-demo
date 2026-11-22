@@ -224,10 +224,19 @@ export async function findAdminRow(db: D1Database, id: string): Promise<AdminRow
     .first<AdminRow>();
 }
 
-/** Demo reservations that still hold a table (limit in ADR-021). */
-export async function countActiveDemo(db: D1Database): Promise<number> {
+/**
+ * Demo reservations that are live and have not started yet (limit in ADR-021). Past ones do not
+ * count: nothing moves them to a final status, so they would block the button for good (v4 R2.1).
+ * `today` / `time` are Kyiv wall-clock values (YYYY-MM-DD, HH:MM).
+ */
+export async function countUpcomingDemo(db: D1Database, today: string, time: string): Promise<number> {
   const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM reservations WHERE is_demo = 1 AND status IN ('pending', 'confirmed')")
+    .prepare(
+      `SELECT COUNT(*) AS n FROM reservations
+       WHERE is_demo = 1 AND status IN ('pending', 'confirmed')
+         AND (date > ? OR (date = ? AND start_time > ?))`,
+    )
+    .bind(today, today, time)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
