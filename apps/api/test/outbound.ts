@@ -4,6 +4,10 @@
 
 import { beforeEach, vi } from "vitest";
 import { aiModel, type AiMessage, type AiReply } from "../src/chat/ai/model";
+import { payments, type CheckoutRequest, type CheckoutState } from "../src/payments";
+
+/** The real Stripe adapter, for tests of its own guards (captured before the spies below). */
+export const realPayments = { ...payments };
 
 export type TurnstileMode = "ok" | "failed" | "http-error" | "network-error";
 export type TelegramMode = "ok" | "failed" | "network-error";
@@ -24,6 +28,18 @@ export const outbound = {
    */
   aiReplies: [] as Array<AiReply | Error>,
   aiCalls: [] as AiMessage[][],
+  /**
+   * v7: a fake Stripe. Created sessions are kept by id; tests set their state (e.g. paid) for the
+   * return check, and switch failures on.
+   */
+  stripe: {
+    checkouts: [] as Array<CheckoutRequest & { id: string }>,
+    sessions: new Map<string, CheckoutState>(),
+    expired: [] as string[],
+    refunds: [] as Array<{ paymentIntentId: string; orderId: string }>,
+    failCheckout: false,
+    failRefund: false,
+  },
 };
 
 const realFetch = globalThis.fetch;
@@ -44,6 +60,27 @@ beforeEach(() => {
   outbound.telegramDone = [];
   outbound.aiReplies = [];
   outbound.aiCalls = [];
+  outbound.stripe = { checkouts: [], sessions: new Map(), expired: [], refunds: [], failCheckout: false, failRefund: false };
+  vi.spyOn(payments, "createCheckout").mockImplementation(async (req) => {
+    if (outbound.stripe.failCheckout) throw new (await import("../src/errors")).HttpError(503, "PAYMENTS_UNAVAILABLE", "fake");
+    const id = `cs_test_${outbound.stripe.checkouts.length + 1}`;
+    outbound.stripe.checkouts.push({ ...req, id });
+    outbound.stripe.sessions.set(id, { id, status: "open", paid: false, paymentIntentId: null, orderId: req.orderId });
+    return { id, url: `https://checkout.stripe.test/${id}` };
+  });
+  vi.spyOn(payments, "retrieveCheckout").mockImplementation(async (id) => {
+    const session = outbound.stripe.sessions.get(id);
+    if (!session) throw new Error(`No fake session ${id}`);
+    return session;
+  });
+  vi.spyOn(payments, "expireCheckout").mockImplementation(async (id) => {
+    outbound.stripe.expired.push(id);
+  });
+  vi.spyOn(payments, "refund").mockImplementation(async (paymentIntentId, orderId) => {
+    if (outbound.stripe.failRefund) throw new Error("fake refund failure");
+    outbound.stripe.refunds.push({ paymentIntentId, orderId });
+    return { id: `re_test_${outbound.stripe.refunds.length}` };
+  });
   vi.spyOn(aiModel, "run").mockImplementation(async (messages) => {
     outbound.aiCalls.push(messages);
     const next = outbound.aiReplies.shift();

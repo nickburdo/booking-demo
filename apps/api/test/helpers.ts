@@ -13,6 +13,7 @@ export function pinClock(now: Date = NOW): void {
 
 export async function clearReservations(): Promise<void> {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM orders"),
     env.DB.prepare("DELETE FROM reservation_slots"),
     env.DB.prepare("DELETE FROM reservations"),
   ]);

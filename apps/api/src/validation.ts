@@ -75,6 +75,17 @@ export const chatStartBody = z.object({
 
 export const adminChatsQuery = z.object({ engine: z.enum(["scripted", "ai"]).optional() });
 
+/** v7: a pre-order (ADR-029). Prices are taken on the server; dish ids are checked against the menu. */
+export const orderBody = z.object({
+  items: z
+    .array(z.object({ itemId: z.string().min(1).max(40), quantity: z.int().min(1).max(10) }).strict())
+    .min(1)
+    .max(30)
+    .refine((items) => new Set(items.map((i) => i.itemId)).size === items.length, "Each dish may appear once"),
+  locale: z.enum(["en", "ru", "uk"]).default("en"),
+});
+export type OrderInput = z.output<typeof orderBody>;
+
 /** A choice id from the offered options, or text (length is checked by the chat engine). */
 export const chatMessageBody = z.union([
   z.object({ choice: z.string().min(1).max(100) }).strict(),

@@ -52,6 +52,8 @@ export interface ChatTexts {
   booked: string;
   bookedLink(link: string): string;
   bookedDemo: string;
+  /** v7 (ADR-029): pre-order with 20% off once the café confirms. */
+  preorderHint: string;
   slotTaken: string;
   askLink: string;
   badLink: string;
@@ -104,6 +106,7 @@ const en: ChatTexts = {
   booked: "Done! Your table is booked. The café has been notified.",
   bookedLink: (link) => `Your private link to view or cancel the booking. Save it now — for privacy it is hidden in this chat after a reload:\n${link}`,
   bookedDemo: "Demo: a real café would also send you a message when it confirms. Here, open the link to see the status.",
+  preorderHint: "After the café confirms, open the link to pre-order dishes and pay online with 20% off.",
   slotTaken: "Sorry, someone has just taken that time. Here are the times still free:",
   askLink: "Paste the link you got after booking (it contains #…).",
   badLink: "That doesn't look like a booking link. Paste the whole link, including the part after #.",
@@ -156,6 +159,7 @@ const ru: ChatTexts = {
   booked: "Готово! Столик забронирован. Кафе получило уведомление.",
   bookedLink: (link) => `Ваша личная ссылка, чтобы посмотреть или отменить бронь. Сохраните её сейчас — ради приватности после перезагрузки в чате она будет скрыта:\n${link}`,
   bookedDemo: "Демо: настоящее кафе ещё прислало бы сообщение, когда подтвердит бронь. Здесь откройте ссылку, чтобы увидеть статус.",
+  preorderHint: "Когда кафе подтвердит бронь, откройте ссылку: там можно заранее заказать блюда и оплатить их онлайн со скидкой 20%.",
   slotTaken: "К сожалению, это время только что заняли. Вот что ещё свободно:",
   askLink: "Вставьте ссылку, которую вы получили после бронирования (в ней есть #…).",
   badLink: "Это не похоже на ссылку на бронь. Вставьте ссылку целиком, вместе с частью после #.",
@@ -208,6 +212,7 @@ const uk: ChatTexts = {
   booked: "Готово! Столик заброньовано. Кавʼярня отримала сповіщення.",
   bookedLink: (link) => `Ваше особисте посилання, щоб переглянути або скасувати бронювання. Збережіть його зараз — заради приватності після перезавантаження в чаті воно буде приховане:\n${link}`,
   bookedDemo: "Демо: справжня кавʼярня ще надіслала б повідомлення, коли підтвердить бронювання. Тут відкрийте посилання, щоб побачити статус.",
+  preorderHint: "Коли кавʼярня підтвердить бронювання, відкрийте посилання: там можна заздалегідь замовити страви й оплатити їх онлайн зі знижкою 20%.",
   slotTaken: "На жаль, цей час щойно зайняли. Ось що ще вільне:",
   askLink: "Вставте посилання, яке ви отримали після бронювання (у ньому є #…).",
   badLink: "Це не схоже на посилання на бронювання. Вставте посилання повністю, разом із частиною після #.",

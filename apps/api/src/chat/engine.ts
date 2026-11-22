@@ -221,7 +221,7 @@ export async function handle(ctx: ChatContext, state: ChatState, input: GuestInp
         const b = step.booking;
         try {
           const { token, row } = await ctx.services.book({ ...b, comment: step.comment });
-          return toMenu(ctx, state, [tx.booked, tx.bookedLink(reservationLink(ctx, token)), tx.bookedDemo], { booked: row, outcome: "booked" });
+          return toMenu(ctx, state, [tx.booked, tx.bookedLink(reservationLink(ctx, token)), tx.preorderHint, tx.bookedDemo], { booked: row, outcome: "booked" });
         } catch (error) {
           if (error instanceof HttpError && (error.code === "SLOT_TAKEN" || error.code === "TIME_NOT_BOOKABLE")) {
             // Someone took the time meanwhile (or it is too close now): offer what is still free.
