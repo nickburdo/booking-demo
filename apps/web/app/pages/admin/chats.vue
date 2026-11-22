@@ -110,15 +110,16 @@ const isDemoNote = (m: AdminChatMessage) => m.sender === 'bot' && /^(Demo|Дем
               <li v-for="c in chats" :key="c.id" class="border-b border-line">
                 <button
                   type="button"
-                  class="grid w-full grid-cols-[minmax(96px,auto)_40px_1fr_auto] items-center gap-2.5 px-2 py-3 text-left"
+                  class="flex w-full flex-wrap items-center gap-x-2.5 gap-y-1 px-2 py-3 text-left sm:grid sm:grid-cols-[minmax(96px,auto)_40px_1fr_auto]"
                   :class="selected?.id === c.id ? 'bg-white' : 'hover:bg-white/60'"
                   :aria-current="selected?.id === c.id ? 'true' : undefined"
                   @click="open(c)"
                 >
                   <span class="text-[15px] tabular-nums">{{ startedLabel(c.startedAt) }}</span>
                   <span class="rounded border border-line px-1 text-center text-xs font-semibold uppercase">{{ c.locale }}</span>
-                  <span class="text-[15px] text-steam">{{ t('admin.chats.messages', c.messages) }}</span>
-                  <span class="rounded-md px-2 py-0.5 text-[13px] font-semibold" :class="outcomeClass[c.outcome]">{{ t(`admin.chats.outcome.${c.outcome}`) }}</span>
+                  <!-- On phones the message count goes to a second line, so long outcome labels fit -->
+                  <span class="order-last w-full text-[15px] text-steam sm:order-none sm:w-auto">{{ t('admin.chats.messages', c.messages) }}</span>
+                  <span class="ml-auto rounded-md px-2 py-0.5 text-[13px] font-semibold sm:ml-0" :class="outcomeClass[c.outcome]">{{ t(`admin.chats.outcome.${c.outcome}`) }}</span>
                 </button>
               </li>
             </ul>
