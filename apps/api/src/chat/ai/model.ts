@@ -35,7 +35,7 @@ export interface AiReply {
 
 /** The model could not be used (Cloudflare's daily free quota or another failure). */
 export class AiUnavailableError extends Error {
-  constructor(readonly quota: boolean, message: string) {
+  constructor(readonly quota: boolean, message: string, readonly timedOut = false) {
     super(message);
     this.name = "AiUnavailableError";
   }
@@ -71,7 +71,7 @@ export const MODEL_TIMEOUT_MS = 25_000;
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new AiUnavailableError(false, `model call timed out after ${ms} ms`)), ms);
+    timer = setTimeout(() => reject(new AiUnavailableError(false, `model call timed out after ${ms} ms`, true)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

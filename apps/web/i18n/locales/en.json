@@ -289,7 +289,7 @@
       "ai": "AI"
     },
     "ai": {
-      "demoNote": "Demo: replies come from an open AI model on Cloudflare and can be wrong. Nothing happens until you press a confirm button. Conversations are visible in the public demo admin with names and phones hidden. The free AI limit is shared by all visitors each day."
+      "demoNote": "Demo: replies come from an open AI model on Cloudflare and can be wrong. Nothing happens until you press a confirm button. Conversations are visible in the public demo admin: phones are hidden, so please share no personal details beyond the name and phone a booking needs. The free AI limit is shared by all visitors each day."
     },
     "start": "Start chat"
   }

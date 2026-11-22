@@ -4,7 +4,8 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DAILY_NEURON_BUDGET, utcDay } from "../src/chat/ai/budget";
 import { AiUnavailableError, normaliseReply, withTimeout, type AiReply } from "../src/chat/ai/model";
-import { maskPhoneLike } from "../src/chat/service";
+import { AI_BUSY_MS, TIMEOUT_NEURONS, TOKEN_CANDIDATES } from "../src/chat/ai/engine";
+import { maskPhoneLike, maskWholeWords } from "../src/chat/service";
 import { booking, call, clearReservations, NOW, pinClock, postJson, THURSDAY, waitFor } from "./helpers";
 import { outbound } from "./outbound";
 
@@ -278,5 +279,94 @@ describe("admin view of AI conversations", () => {
 
   it("masks phone-like text but not dates", () => {
     expect(maskPhoneLike("call me at 067 123 45 67 on 2026-12-03")).toBe("call me at +380 67 *** ** 67 on 2026-12-03");
+  });
+});
+
+describe("code review fixes (v6 R3)", () => {
+  const chatRow = () => env.DB.prepare("SELECT state, outcome FROM chat_sessions").first<{ state: string; outcome: string }>();
+
+  it("R3.1: does not store a bare token written in the middle of a message", async () => {
+    const made = (await (await postJson("/reservations", booking({ time: "15:00" }))).json()) as any;
+    const { body } = await startAi();
+    outbound.aiReplies.push(text("Found it."));
+    await say(body.token, { text: `please cancel ${made.token} thanks` });
+    const stored = await env.DB.prepare("SELECT group_concat(text) AS m FROM chat_messages").first<any>();
+    expect(stored.m).not.toContain(made.token);
+    expect(stored.m).toContain("please cancel •••• thanks");
+  });
+
+  it("R3.2: refuses a message over 500 characters without calling the model", async () => {
+    const { body } = await startAi();
+    const r = await say(body.token, { text: "a".repeat(501) });
+    expect(texts(r.body.turn)).toContain("too long");
+    expect(r.body.turn.input.kind).toBe("text");
+    expect(outbound.aiCalls).toHaveLength(0);
+  });
+
+  it("R3.3: an AI step stays busy longer than a scripted one", async () => {
+    const { body } = await startAi();
+    const mark = async (msAgo: number) => {
+      const state = JSON.parse((await chatRow())!.state);
+      state.busySince = new Date(NOW.getTime() - msAgo).toISOString();
+      await env.DB.prepare("UPDATE chat_sessions SET state = ?").bind(JSON.stringify(state)).run();
+    };
+    await mark(60_000);
+    expect((await say(body.token, { text: "hi" })).res.status).toBe(409);
+    await mark(AI_BUSY_MS + 10_000);
+    outbound.aiReplies.push(text("Hello!"));
+    expect((await say(body.token, { text: "hi" })).res.status).toBe(200);
+  });
+
+  it("R3.4: keeps the guest's message when one turn makes many tool calls", async () => {
+    const { body } = await startAi();
+    const many = (): AiReply => {
+      const calls = [0, 1, 2, 3].map((i) => tool("check_availability", { date: THURSDAY, guests: 2 + (i % 2) }).toolCalls[0]!);
+      return { text: "", toolCalls: calls, usage: { input: 1000, output: 50 } };
+    };
+    outbound.aiReplies.push(many(), many(), many(), text("Here are the free times."));
+    await say(body.token, { text: "What is free on Thursday?" });
+    expect(outbound.aiCalls).toHaveLength(4);
+    expect(outbound.aiCalls[3]!.some((m) => m.role === "user")).toBe(true);
+  });
+
+  it("R3.5: finds a bare token that starts with '-'", () => {
+    const token = "-" + "a".repeat(42);
+    expect([...`cancel ${token} please`.matchAll(TOKEN_CANDIDATES)].map((m) => m[0])).toEqual([token]);
+  });
+
+  it("R3.7: leaves date-times alone and replaces names only as whole words", () => {
+    expect(maskPhoneLike("free on 2026-11-27 18:00")).toBe("free on 2026-11-27 18:00");
+    expect(maskPhoneLike("2026-11-27 0671234567")).toBe("2026-11-27 +380 67 *** ** 67");
+    expect(maskWholeWords("Already booked for Al Smith", ["Al Smith"])).toBe("Already booked for Al S.");
+    expect(maskWholeWords("Already here, Al", ["Al"])).toBe("Already here, Al");
+  });
+
+  it("R3.8: counts a timed-out model call in today's budget", async () => {
+    const { body } = await startAi();
+    outbound.aiReplies.push(new AiUnavailableError(false, "timed out", true));
+    const r = await say(body.token, { text: "hi" });
+    expect(texts(r.body.turn)).toContain("unavailable right now");
+    const used = await env.DB.prepare("SELECT neurons FROM ai_usage").first<{ neurons: number }>();
+    expect(used!.neurons).toBe(TIMEOUT_NEURONS);
+  });
+
+  it("R3.9: an unknown link does not make the outcome 'found'", async () => {
+    const { body } = await startAi();
+    outbound.aiReplies.push(text("That link matches no booking."));
+    await say(body.token, { text: `cancel https://site.test/reservation#${"b".repeat(43)}` });
+    expect((await chatRow())!.outcome).toBe("questions");
+  });
+
+  it("R3.10: a failed cancellation is not offered again", async () => {
+    const made = (await (await postJson("/reservations", booking({ time: "15:00" }))).json()) as any;
+    const { body } = await startAi();
+    outbound.aiReplies.push(tool("propose_cancellation", { booking_ref: "B1" }));
+    await say(body.token, { text: `cancel https://site.test/reservation#${made.token}` });
+    await env.DB.prepare("UPDATE reservations SET status = 'cancelled', cancelled_by = 'owner'").run();
+    const r = await say(body.token, { choice: "confirm" });
+    expect(r.res.status).toBe(200);
+    const state = JSON.parse((await chatRow())!.state);
+    expect(state.found.B1.cancellable).toBe(false);
+    expect(JSON.stringify(state.history)).toContain("Cancelling B1 failed");
   });
 });

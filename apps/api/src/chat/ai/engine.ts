@@ -8,7 +8,7 @@ import { TEXTS, formatDate } from "../texts";
 import type { ChatServices, Effects, GuestInput, Input, Locale, Option, Turn } from "../types";
 import { tokenFromLink } from "../engine";
 import { addNeurons, budgetLeft } from "./budget";
-import { aiModel, AiUnavailableError, neuronsFor, type AiMessage } from "./model";
+import { aiModel, AiUnavailableError, MODEL_TIMEOUT_MS, neuronsFor, type AiMessage } from "./model";
 import { systemPrompt } from "./prompt";
 import { AI_TEXTS } from "./texts";
 import { AI_TOOLS, runTool, type FoundBooking, type Proposal } from "./tools";
@@ -17,6 +17,15 @@ export const AI_MAX_GUEST_MESSAGES = 20;
 export const AI_MAX_TEXT = 500;
 const MAX_MODEL_CALLS = 4;
 const HISTORY_LIMIT = 12;
+/** An AI turn can take up to MAX_MODEL_CALLS timed-out calls; its busy mark lives longer (v6 R3.3). */
+export const AI_BUSY_MS = MAX_MODEL_CALLS * MODEL_TIMEOUT_MS + 20_000;
+/** What a timed-out call is charged: Cloudflare still bills it, the reply never tells us (v6 R3.8). */
+export const TIMEOUT_NEURONS = neuronsFor({ input: 2000, output: 600 });
+/**
+ * Pasted links and bare tokens in a guest message (v6 R3.5: lookarounds, since "\b" fails next to "-").
+ * Shared with redactTokens so whatever the model never sees is not stored either (v6 R3.1).
+ */
+export const TOKEN_CANDIDATES = /\S*#[A-Za-z0-9_-]{20,100}|(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40,50}(?![A-Za-z0-9_-])/g;
 
 export interface AiState {
   engine: "ai";
@@ -67,7 +76,10 @@ export function startAi(locale: Locale): { state: AiState; turn: Turn } {
 function trimmed(history: AiMessage[]): AiMessage[] {
   let start = Math.max(0, history.length - HISTORY_LIMIT);
   while (start < history.length && history[start]!.role !== "user") start++;
-  return history.slice(start);
+  if (start < history.length) return history.slice(start);
+  // A long turn (many tool calls) pushed the guest's message out: keep it anyway (v6 R3.4).
+  const lastUser = history.findLastIndex((m) => m.role === "user");
+  return lastUser >= 0 ? history.slice(lastUser) : history;
 }
 
 function proposalTurn(locale: Locale, proposal: Proposal): { message: string; input: Input } {
@@ -119,7 +131,14 @@ async function confirm(ctx: AiContext, state: AiState, proposal: Proposal): Prom
       next.found = found;
       return done(ctx.locale, next, [st.cancelled], { cancelled: row });
     } catch (error) {
-      if (error instanceof HttpError && (error.code === "NOT_CANCELLABLE" || error.code === "NOT_FOUND")) return done(ctx.locale, next, [st.notCancellable]);
+      if (error instanceof HttpError && (error.code === "NOT_CANCELLABLE" || error.code === "NOT_FOUND")) {
+        // So the model does not offer the same cancellation again (v6 R3.10).
+        const found = { ...state.found };
+        if (found[proposal.ref]) found[proposal.ref] = { ...found[proposal.ref]!, cancellable: false };
+        next.found = found;
+        next.history = [...state.history, note(`(Cancelling ${proposal.ref} failed: it can no longer be cancelled.)`)];
+        return done(ctx.locale, next, [st.notCancellable]);
+      }
       throw error;
     }
   }
@@ -136,7 +155,8 @@ async function confirm(ctx: AiContext, state: AiState, proposal: Proposal): Prom
 async function resolveLinks(ctx: AiContext, state: AiState, text: string): Promise<{ content: string; found: Record<string, FoundBooking>; any: boolean }> {
   const found = { ...state.found };
   const notes: string[] = [];
-  const candidates = [...text.matchAll(/\S*#[A-Za-z0-9_-]{20,100}|\b[A-Za-z0-9_-]{40,50}\b/g)].map((m) => m[0]);
+  const candidates = [...text.matchAll(TOKEN_CANDIDATES)].map((m) => m[0]);
+  let resolved = false;
   let content = text;
   for (const candidate of candidates) {
     const token = tokenFromLink(candidate);
@@ -148,6 +168,7 @@ async function resolveLinks(ctx: AiContext, state: AiState, text: string): Promi
       const started = minutesUntil(r.date, r.time, ctx.now) <= 0;
       const ref = `B${Object.keys(found).length + 1}`;
       found[ref] = { reservationId: r.id, date: r.date, time: r.time, guests: r.guests, cancellable: live && !started };
+      resolved = true;
       const status = !live ? r.status : started ? "already started" : r.status === "confirmed" ? "confirmed by the café" : "waiting for the café to confirm";
       notes.push(`[Server: booking ${ref} from the pasted link: ${r.date} ${r.time}-${endTime(r.time)}, ${r.guests} guests, ${status}, ${live && !started ? "can be cancelled" : "cannot be cancelled"}.]`);
     } catch (error) {
@@ -155,7 +176,8 @@ async function resolveLinks(ctx: AiContext, state: AiState, text: string): Promi
       notes.push("[Server: the pasted link matches no booking.]");
     }
   }
-  return { content: [content, ...notes].join("\n"), found, any: notes.length > 0 };
+  // Outcome "found" only when a booking was actually resolved (v6 R3.9).
+  return { content: [content, ...notes].join("\n"), found, any: resolved };
 }
 
 export async function handleAi(ctx: AiContext, state: AiState, input: GuestInput): Promise<Result> {
@@ -172,6 +194,8 @@ export async function handleAi(ctx: AiContext, state: AiState, input: GuestInput
 
   const text = input.text.trim();
   if (!text) return done(ctx.locale, state, [tx.emptyText], {}, state.awaiting);
+  // The browser limits the field too; the server enforces it so nobody burns the budget (v6 R3.2).
+  if (text.length > AI_MAX_TEXT) return done(ctx.locale, state, [tx.tooLong], {}, state.awaiting);
 
   const links = await resolveLinks(ctx, state, text);
   let next: AiState = { ...state, pending: null, found: links.found, history: [...state.history, { role: "user", content: links.content }] };
@@ -185,6 +209,7 @@ export async function handleAi(ctx: AiContext, state: AiState, input: GuestInput
     } catch (error) {
       if (error instanceof AiUnavailableError) {
         console.error("AI model call failed:", error.message);
+        if (error.timedOut) await addNeurons(ctx.db, ctx.now, TIMEOUT_NEURONS);
         return error.quota ? done(ctx.locale, next, [tx.budgetUsed], effects, { kind: "none" }) : done(ctx.locale, next, [tx.unavailable], effects);
       }
       throw error;

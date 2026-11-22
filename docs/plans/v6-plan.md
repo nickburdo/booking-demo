@@ -170,3 +170,65 @@ say that you do not know and offer to pass the question to the staff (propose_me
 tests, a commit and a redeploy of the API (the site does not change).
 
 **Done when:** the same question on the live site gets "I don't know, I can pass it to the staff".
+
+## Revision R3 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** the Phase 6.1 review of `main...feature/v6-ai-chat` found 10 confirmed issues (checked
+against the code). Decisions (user): names → an honest demo notice; fix all four minor findings too.
+Every fix is a small in-place change; no architecture changes.
+
+### R3.1 A bare token inside an AI message is stored unredacted (security)
+- `resolveLinks` replaces bare 40–50-char tokens anywhere in the text; `redactTokens` masks only
+  `#token` or a whole-message token, so "please cancel <token> thanks" is stored with the token.
+- Fix: one shared token-candidate regex (exported from `chat/ai/engine.ts`); `redactTokens` for
+  field `"message"` replaces every candidate that `tokenFromLink` accepts with `••••`.
+- Test: a token in the middle of a message is not in the stored transcript.
+
+### R3.2 The 500-character limit is only enforced by the browser
+- Fix: `handleAi` answers a text longer than `AI_MAX_TEXT` with a new `AI_TEXTS.tooLong` (en/ru/uk),
+  keeps `state.awaiting`, makes no model call.
+- Test: a 501-character message → the hint, no model call.
+
+### R3.3 The 30 s busy mark is shorter than an AI turn (up to 4 × 25 s)
+- Fix: the stale threshold depends on the engine: scripted 30 s, AI
+  `MAX_MODEL_CALLS × MODEL_TIMEOUT_MS + 20 s` (120 s).
+- Test: an AI session marked busy 60 s ago → conflict; 130 s ago → the step runs.
+
+### R3.4 History trimming can drop every guest message
+- Fix: `trimmed()` never starts after the latest user message, even past `HISTORY_LIMIT`.
+- Test: a history whose last 12 entries hold no user message keeps the latest user message.
+
+### R3.5 A bare token starting or ending with "-" loses that character
+- Fix: explicit lookarounds `(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40,50}(?![A-Za-z0-9_-])` instead of `\b`.
+- Test: a token starting with "-" is found.
+
+### R3.6 The AI demo notice promises hidden names (decision: honest notice)
+- Names typed in free text cannot be found reliably. The AI notice (server `AI_TEXTS.demoNotice`
+  and web `chat.ai.demoNote`, en/ru/uk) says instead: phones are hidden; please do not write
+  personal details beyond the name and phone a booking needs. Names from proposals stay masked.
+- `docs/api.md` (AI chat → admin) is updated to match.
+
+### R3.7 Masking: date-times look like phones; short names hit other words
+- Fix: `maskPhoneLike` leaves a match that starts with `YYYY-MM-DD` alone; proposal names are replaced
+  only as whole words (Unicode letter/digit lookarounds).
+- Test: "2026-11-27 18:00" stays; the name "Al" does not change "Already".
+
+### R3.8 A timed-out model call is not counted in the budget
+- Fix: on a timeout the engine adds an estimate of one call (`neuronsFor({ input: 2000, output: 600 })`,
+  about 105 neurons); `AiUnavailableError` gets a `timedOut` flag.
+- Test: a timed-out call raises today's neurons by the estimate.
+
+### R3.9 Outcome "found" when a pasted link matched no booking
+- Fix: `any` is true only when a booking was resolved.
+- Test: an unknown link → outcome "questions".
+
+### R3.10 A failed cancellation is offered again
+- Fix: on NOT_CANCELLABLE / NOT_FOUND, mark `found[ref].cancellable = false` and add a history note.
+- Test: after a failed confirm the state marks the booking as not cancellable.
+
+### Steps after the fixes
+1. Tests and typecheck green; one commit.
+2. Deploy the API, then the site (ask before each).
+3. Live check: a token in the middle of a message is masked in the admin; the new notice is shown.
+
+**Done when:** all R3 tests pass and the live check above passes.

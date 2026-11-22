@@ -6,7 +6,7 @@ import { HttpError } from "../errors";
 import { maskName, maskPhone } from "../mask";
 import { generateToken, hashToken } from "../token";
 import { normalisePhone } from "../validation";
-import { AI_MAX_GUEST_MESSAGES, handleAi, startAi, type AiState } from "./ai/engine";
+import { AI_BUSY_MS, AI_MAX_GUEST_MESSAGES, TOKEN_CANDIDATES, handleAi, startAi, type AiState } from "./ai/engine";
 import { checkInput, handle, start, tokenFromLink } from "./engine";
 import {
   CHAT_RETENTION_DAYS,
@@ -89,9 +89,10 @@ export async function replyToChat(
   const { busySince, ...state } = JSON.parse(row.state) as ChatState | AiState;
   const conflict = () =>
     new HttpError(409, "CHAT_CONFLICT", "Another message for this step is being handled. Reload the conversation.");
-  // Another request is working on this step (v5 R2.2). A mark older than BUSY_MS is from a request
-  // that died half-way and no longer blocks the conversation.
-  if (busySince && now.getTime() - Date.parse(busySince) < BUSY_MS) throw conflict();
+  // Another request is working on this step (v5 R2.2). A mark older than BUSY_MS (AI: AI_BUSY_MS,
+  // v6 R3.3) is from a request that died half-way and no longer blocks the conversation.
+  const busyMs = row.engine === "ai" ? AI_BUSY_MS : BUSY_MS;
+  if (busySince && now.getTime() - Date.parse(busySince) < busyMs) throw conflict();
 
   const guest = checkInput(state.awaiting, input);
   if (!guest) throw new HttpError(400, "VALIDATION", "This answer does not fit the current question.");
@@ -145,8 +146,11 @@ export const BUSY_MS = 30_000;
 /** Replaces reservation tokens with "••••" in text that is stored (v5 R2.1). */
 export function redactTokens(text: string, field: string | null): string {
   const masked = text.replace(/#[A-Za-z0-9_-]{20,100}/g, "#••••");
-  // A bare token pasted as the "link" answer (scripted) or as a whole AI chat message (v6).
-  return (field === "link" || field === "message") && tokenFromLink(masked) ? "••••" : masked;
+  // A bare token pasted as the "link" answer (scripted).
+  if (field === "link") return tokenFromLink(masked) ? "••••" : masked;
+  // AI chat: every bare token the engine would resolve, anywhere in the message (v6 R3.1).
+  if (field === "message") return masked.replace(TOKEN_CANDIDATES, (m) => (tokenFromLink(m) ? "••••" : m));
+  return masked;
 }
 
 export async function chatHistory(
@@ -213,10 +217,10 @@ export async function adminChatTranscript(db: D1Database, id: string) {
   if (chat.engine === "ai") {
     // v6 P10: in free text the guest can write a name or a phone anywhere. Names come from the
     // AI's proposals; anything that looks like a phone number is masked in every message.
-    const aiNames = proposalNames(JSON.parse(chat.state) as AiState).map((n): [string, string] => [n, maskName(n)]);
+    const aiNames = proposalNames(JSON.parse(chat.state) as AiState);
     return {
       chat: toAdminChat(chat),
-      messages: rows.map((m) => ({ sender: m.sender, text: maskPhoneLike(replaceAll(m.text, aiNames)), at: m.created_at })),
+      messages: rows.map((m) => ({ sender: m.sender, text: maskPhoneLike(maskWholeWords(m.text, aiNames)), at: m.created_at })),
     };
   }
 
@@ -243,12 +247,23 @@ function proposalNames(state: AiState): string[] {
   return [...names];
 }
 
+/** Replaces each name only as a whole word, so "Al" does not change "Already" (v6 R3.7). */
+export function maskWholeWords(text: string, names: string[]): string {
+  const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [...names]
+    .sort((a, b) => b.length - a.length)
+    .reduce((acc, name) => acc.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, "gu"), maskName(name)), text);
+}
+
 /** Masks phone-like sequences (8+ digits with spaces, dashes or brackets) in free text. */
 export function maskPhoneLike(text: string): string {
   return text.replace(/\+?\d[\d\s\-()]{6,}\d/g, (match) => {
     const digits = match.replace(/\D/g, "");
-    // Dates like 2026-11-27 have eight digits too; they are not phones.
-    if (digits.length < 8 || /^\d{4}-\d{2}-\d{2}$/.test(match.trim())) return match;
+    if (digits.length < 8) return match;
+    // Dates like 2026-11-27 have eight digits too; they are not phones. What follows a date (a time,
+    // or a phone glued to it) is checked on its own (v6 R3.7).
+    const date = /^\d{4}-\d{2}-\d{2}(?!\d)/.exec(match)?.[0];
+    if (date) return date + maskPhoneLike(match.slice(date.length));
     const e164 = normalisePhone(match) ?? `+${digits}`;
     return maskPhone(e164);
   });
