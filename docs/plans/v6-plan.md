@@ -1,6 +1,6 @@
 # v6 plan — AI chat next to the scripted one
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R3
 - **Scope:** stage v6 of the roadmap (`docs/overview.md`): the "AI" tab of the chat widget (v5 R1)
   becomes a working AI chat on **Cloudflare Workers AI** (free daily quota, no new account). An
   open model with tool calling understands free text and uses **tools** that call the same booking

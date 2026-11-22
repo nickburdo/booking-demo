@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1–v5 implemented, v6 planned** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1–v6 implemented, v7 planned** (2026-11-22). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -247,7 +247,7 @@ Learned in v5:
 - `wrangler dev` exposes a local D1 explorer API (`/cdn-cgi/local/explorer/api/d1/…/raw`), handy
   for preparing states in browser tests (e.g. an expired conversation).
 
-## AI chat (v6) — planned
+## AI chat (v6) — implemented
 
 Plan: `docs/plans/v6-plan.md`. Contract: `docs/api.md` → AI chat. Decisions: ADR-026, ADR-027.
 
@@ -256,5 +256,24 @@ Plan: `docs/plans/v6-plan.md`. Contract: `docs/api.md` → AI chat. Decisions: A
   café), the AI engine next to the scripted one with the same bot turns; migration `0006`
   (`chat_sessions.engine`, `ai_usage`); daily neuron budget.
 - Web: the chat widget's AI tab runs its own conversation; admin chats show the engine and filter
-  by it.
+  by it. A conversation starts only when the guest presses "Start chat" after the bot check (R1).
+- Model: `@cf/openai/gpt-oss-120b`, chosen in a trial of four models on eight scenarios (plan →
+  "Step 1.3 result"). A model call times out after 25 s; a turn makes at most 4 calls.
+
+Learned in v6:
+- Workers AI binding calls always run remotely, also in `wrangler dev`: local development spends
+  the real free quota, and tests must mock the model and set `remoteBindings: false`.
+- Open models with tool calling differ a lot on the same prompt: a small trial on real scenarios
+  (wrong dates, invented times, tool calls written as text) was worth more than benchmarks.
+- gpt-oss leaks its channel markers into tool names (`propose_booking<|channel|>…`); the adapter
+  cleans them.
+- Let the server write the summary of every proposal and the confirmation: the model's own words
+  could claim that a booking was done before the guest confirmed.
+- Without an explicit rule the model fills gaps in the facts with guesses ("no oat milk"); the
+  prompt now says to admit not knowing and offer the staff (R2, found in the live check).
+- Workers AI sometimes stalls for a minute; a timeout per call and a busy mark longer than a whole
+  AI turn are needed (R3).
+- Masking free text is harder than masking form fields: tokens and phones can be found with
+  patterns, names cannot — be honest about it in the notice instead (R3).
+- `Date.now()` at a Worker's module scope reads 1970; compute dates inside handlers.
 

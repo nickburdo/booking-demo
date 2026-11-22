@@ -31,8 +31,15 @@ v5 is live: a **chat** on the landing page ("Chat with us" in the corner). It is
 AI — and runs on the server: it books a table, finds a booking from its link (and cancels it),
 answers about hours, address and menu, and passes a question to the café. It uses the same
 booking rules as the form. Conversations are shown in the admin ("Chats" tab), with names and
-phones hidden. The chat has a second tab, **AI**, which says "coming soon": the AI chat of v6
-will appear next to the scripted one, so the two can be compared.
+phones hidden.
+
+v6 is live: the chat's second tab, **AI**, is an AI chat next to the scripted one, so the two can
+be compared. The guest writes in their own words; an open model on **Cloudflare Workers AI**
+(`gpt-oss-120b`, free daily quota) understands the request and uses tools that call the same
+booking services: it books, finds and cancels a booking from its link, answers about hours,
+address and menu, and passes a question to the café. **The AI only proposes** — nothing happens
+until the guest presses Confirm on a summary the server writes. AI conversations are shown in the
+admin next to the scripted ones, with a filter.
 
 ## Demo limitations
 
@@ -46,7 +53,9 @@ This is a demo, so some things a real booking service would do are left out on p
 | **Telegram messages go only to the owner** (new and cancelled bookings), not for admin actions | Messages for the staff on every change, and to guests if they opted in |
 | The chat's **"ask a person"** sends the question to the owner's Telegram, but **nobody calls back** | A real hand-off: staff answer in the chat or call the guest |
 | **Chat conversations are visible in the public admin** (names and phones hidden) and deleted after 7 days | Only staff see them; retention follows a privacy policy |
-| The chat is **scripted**: buttons and a few fields, no free text | v6 adds an AI chat that understands free text, next to the scripted one |
+| The **AI chat runs on a free daily quota** shared by all visitors; when it is used up, the AI tab says so until 00:00 UTC (the scripted tab keeps working) | A paid plan sized to real traffic |
+| The AI is an **open model and can be wrong** (a demo notice says so); it only proposes, the guest confirms | A stronger model, evaluation on real conversations, and human review |
+| In AI conversations **phones are masked in the admin, but a name written in free text may be shown**; the notice asks for no extra personal data | Only staff see conversations |
 
 ## Roadmap
 
@@ -57,7 +66,7 @@ This is a demo, so some things a real booking service would do are left out on p
 | v3 | Booking form + Telegram notification to the owner | ✅ Done |
 | v4 | Admin: list reservations, confirm/cancel | ✅ Done |
 | v5 | Scripted chat (no AI) on the same API | ✅ Done |
-| v6 | AI chat calling the same API via tool calls | Planned |
+| v6 | AI chat calling the same API via tool calls | ✅ Done |
 | v7 | Prepayment in a payment provider's test mode | Planned |
 
 ## Stack
@@ -71,6 +80,7 @@ This is a demo, so some things a real booking service would do are left out on p
 - **API:** Express 5 on Cloudflare Workers (`nodejs_compat`), Cloudflare D1 (SQLite) with raw SQL
   and migrations, zod validation, Workers Rate Limiting
 - **Notifications and bot check:** Telegram Bot API, Cloudflare Turnstile
+- **AI chat:** Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`) with tool calling, through the `AI` binding
 - **Tests (API):** Vitest with `@cloudflare/vitest-plugin`, running inside `workerd` on a local D1
 - **Repo:** pnpm workspaces monorepo (`apps/web`, `apps/api`)
 
