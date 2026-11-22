@@ -126,3 +126,23 @@
 ### 6.2 README (AI chat on Workers AI, demo limitations: daily free limit, open model can make
   mistakes), `docs/architecture.md` (v6 implemented, learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Step 1.3 result (2026-11-22) — model trial
+
+Same 8 scripted conversations (EN/RU/UK) per model, dry tools, about 2,100 neurons in total
+(`apps/api/scripts/model-trial/`, local only). Corrected for a trial bug (the expected "tomorrow" was
+computed at Worker start, when the Workers clock reads 1970).
+
+| Model | Passed | Main problems | Neurons / 8 conversations |
+|---|---|---|---|
+| `@cf/openai/gpt-oss-120b` | 7 / 8 | asked which Saturday (a fair clarification) | ~530 |
+| `@cf/openai/gpt-oss-20b` | 6 / 8 | wrote a tool call as JSON text; skipped the availability check | ~290 |
+| `@cf/meta/llama-4-scout-17b-16e-instruct` | 6 / 8 | made up free times, wrong "tomorrow", proposed 10 guests | ~540 |
+| `@cf/mistralai/mistral-small-3.1-24b-instruct` | 6 / 8 | refused an allowed time, wrong Saturday, no proposal | ~490 |
+
+Findings for Phase 2: gpt-oss can leak channel markers into tool names (`propose_booking<|channel|>analysis`)
+— the adapter strips them; all models sometimes say "passed / booked" before the guest confirms — the
+prompt must say so, and the server summary stays the authority.
+
+**Decision (user):** `@cf/openai/gpt-oss-120b` (about 35 real conversations a day within the 9,000-neuron budget).
+

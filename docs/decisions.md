@@ -275,7 +275,8 @@ has confirmed it in discussion.
 
 ## ADR-026 — AI chat on Cloudflare Workers AI with propose-then-confirm tools
 
-- **Status:** Accepted (2026-11-22, v6 plan); the model is chosen in v6 step 1.3
+- **Status:** Accepted (2026-11-22, v6 plan). Model: `@cf/openai/gpt-oss-120b`, chosen by the user after
+  the step 1.3 trial (7 of 8 test conversations; the other candidates made up times or dates).
 - **Context:** The roadmap's AI chat must book through the same validated backend as every other
   interface (anti-goal in `docs/overview.md`). The demo is public and should cost nothing; the
   Anthropic API requires buying credits before the first call.
