@@ -402,14 +402,19 @@ test cards only, no real money). Decisions: ADR-028, ADR-029.
   ],
   "total": 215,
   "discountPercent": 20,
-  "amount": 172,
-  "currency": "uah",
+  "discounted": 172,
+  "amount": 344,
+  "currency": "eur",
+  "rate": 50,
   "paidAt": "2026-11-28T09:12:00.000Z",
   "refundedAt": null
 }
 ```
 
-`price` and `total` are full prices in hryvnias; `amount` is what is charged (after the discount).
+`price`, `total` and `discounted` are in hryvnias (menu prices; `discounted` after 20% off). The
+charge is in **euros** at a fixed demo rate (`rate`: 1 € = 50 ₴, v7 R1): `amount` is in euro cents,
+the sum of the lines, each `round(price × 0.8 / rate × 100)` × quantity. Stripe's page shows only
+the euro amount (Adaptive Pricing is off).
 Item names are stored in English and shown on the site from the menu in the page's language.
 
 ```

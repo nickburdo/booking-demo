@@ -321,7 +321,9 @@ has confirmed it in discussion.
   status changes are conditional updates, so repeated or late events change nothing. Refunds use
   `refunds.create` by payment intent. All Stripe calls go through one adapter (the official
   `stripe` package with its fetch HTTP client); the API refuses to work with a key that is not
-  `sk_test_…`. Keys are Worker secrets.
+  `sk_test_…`. Keys are Worker secrets. The test account is registered as Germany (Stripe does not
+  offer Ukraine), so the charge is in **euros** at a fixed demo rate of 1 € = 50 ₴ (menu prices stay
+  in hryvnias), with Adaptive Pricing off so the guest sees one amount (v7 R1).
 - **Why:** A hosted page keeps card data away from the demo and is the same pattern most providers
   use (create → pay at the provider → signed notification → our status), which is what v7 is
   about. Stripe has test mode without account activation and the best documentation. monobank and

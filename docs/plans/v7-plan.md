@@ -142,3 +142,31 @@
 ### 7.2 README (pre-order and test payments, demo limitations: test mode, test cards), `docs/architecture.md`
   (v7 implemented, learned), this plan → Done.
 ### 7.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Revision R1 (2026-11-22) — pay in euros at a fixed demo rate (approved)
+
+**Trigger:** step 1.2. Stripe does not offer Ukraine at sign-up; the user created the test account
+as Germany (`country: DE`, default currency EUR). The user decided not to try UAH (P4) and to
+charge in **euros at a fixed rate**, since it is a demo. Step 1.4 check: a test Checkout Session in
+EUR is created and opens. Stripe's **Adaptive Pricing** then offered the guest a UAH price at its
+own rate (+4%); with `adaptive_pricing[enabled]=false` only the euro amount is shown (checked).
+
+**Decisions (user):**
+- Menu prices stay in hryvnias on the site; the charge is in **EUR** at a fixed demo rate of
+  **1 € = 50 ₴** (one constant in the code, labelled as a demo rate).
+- **Euros only** on Stripe's page: every Checkout Session sets `adaptive_pricing[enabled]=false`.
+
+**Changes to the plan:**
+- P3: each line item's unit price in euro cents = `round(price_uah × 0.8 / 50 × 100)`; the charged
+  amount is the sum of the lines (so Stripe's total and ours always match).
+- P4: replaced by the above (UAH is not used for payments).
+- P5: `orders.amount` is in euro cents, `currency = 'eur'`; `total_uah` (full) and the discounted
+  hryvnia total are kept for display.
+- P12: the pre-order block shows the totals in hryvnias and the charge in euros, e.g. "215 ₴ →
+  172 ₴ with 20% off · you pay 3,44 € (demo rate 1 € = 50 ₴)".
+- Risk R2 closed. Docs: `docs/api.md` (order object), ADR-028 (currency) updated.
+
+**Business name on Stripe's page:** the sandbox's name ("Nick Burdo sandbox", the owner's name)
+cannot be changed without verifying a business (the dashboard locks "Manage sandboxes"). Every
+Checkout Session therefore sets `branding_settings[display_name]=Linden Coffee`, so the page shows
+the café's name (checked). Only the browser tab title keeps the sandbox name; accepted by the user.
