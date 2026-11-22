@@ -4,7 +4,7 @@
 import { createReservation, getAvailability } from "./booking";
 import { HttpError } from "./errors";
 import { maskName, maskPhone } from "./mask";
-import { adminOrders, type OrderDto } from "./orders";
+import { adminOrders, closeOpenCheckouts, type OrderDto } from "./orders";
 import {
   ACTIVE_STATUSES,
   cancelReservation,
@@ -60,7 +60,7 @@ export function toAdminDto(row: AdminRow, order: OrderDto | null = null): AdminR
 
 export async function listDay(db: D1Database, date: string): Promise<AdminReservationDto[]> {
   const rows = await listByDate(db, date);
-  const orders = await adminOrders(db, rows.map((r) => r.id));
+  const orders = await adminOrders(db, { date });
   return rows.map((r) => toAdminDto(r, orders.get(r.id) ?? null));
 }
 
@@ -109,13 +109,15 @@ export async function applyAction(
         : await markNoShow(db, id, at);
 
   const updated = (await findAdminRow(db, id))!;
-  const order = (await adminOrders(db, [id])).get(id) ?? null;
+  const order = (await adminOrders(db, { reservationId: id })).get(id) ?? null;
   if (!changed) {
     // v7: the cancel was refused because the booking has a paid pre-order (ADR-029).
     if (action === "cancel" && order?.status === "paid") throw paidBooking();
     // Someone else changed it between our read and our write (ADR-022).
     throw notAllowed(action, updated, started);
   }
+  // A cancelled booking must not stay payable from an open Stripe page (v7 R3.4); best effort.
+  if (action === "cancel") await closeOpenCheckouts(db, id).catch((error) => console.error("Closing checkouts failed:", error));
   return toAdminDto(updated, order);
 }
 

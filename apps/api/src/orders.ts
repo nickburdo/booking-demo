@@ -5,7 +5,7 @@ import { cafe, type MenuItem } from "@booking-demo/cafe-data";
 import { waitUntil } from "cloudflare:workers";
 import { HttpError } from "./errors";
 import { payments } from "./payments";
-import { ACTIVE_STATUSES, findById, findByTokenHash, type ReservationRow } from "./repo";
+import { findById, findByTokenHash, type ReservationRow } from "./repo";
 import { buildOrderMessage, sendTelegram, type OrderNoticeKind, type TelegramConfig } from "./telegram";
 import { minutesUntil } from "./time";
 import { hashToken } from "./token";
@@ -123,30 +123,64 @@ export function shownOrder(db: D1Database, reservationId: string): Promise<Order
     .first<OrderRow>();
 }
 
-/** Orders of past payments for the admin list: paid, refunded or refund failed (P10). */
-export async function adminOrders(db: D1Database, reservationIds: string[]): Promise<Map<string, OrderDto>> {
-  const map = new Map<string, OrderDto>();
-  if (reservationIds.length === 0) return map;
+// The admin sees a failed refund first: it is money the owner must return by hand (v7 R3.8).
+const ADMIN_ORDER = `ORDER BY CASE o.status WHEN 'refund_failed' THEN 0 WHEN 'paid' THEN 1 ELSE 2 END, o.created_at DESC`;
+
+/**
+ * Orders of past payments for the admin: paid, refunded or refund failed (P10), for one day or one
+ * reservation. One query by date, no list of ids: D1 allows 100 bound parameters (v7 R3.7).
+ */
+export async function adminOrders(db: D1Database, filter: { date: string } | { reservationId: string }): Promise<Map<string, OrderDto>> {
+  const where = "date" in filter ? "r.date = ?" : "r.id = ?";
   const { results } = await db
     .prepare(
-      `SELECT * FROM orders WHERE reservation_id IN (${reservationIds.map(() => "?").join(", ")})
-         AND status IN ('paid', 'refund_failed', 'refunded') ${SHOWN_ORDER}`,
+      `SELECT o.* FROM orders o JOIN reservations r ON r.id = o.reservation_id
+       WHERE ${where} AND o.status IN ('paid', 'refund_failed', 'refunded') ${ADMIN_ORDER}`,
     )
-    .bind(...reservationIds)
+    .bind("date" in filter ? filter.date : filter.reservationId)
     .all<OrderRow>();
+  const map = new Map<string, OrderDto>();
   for (const row of results) if (!map.has(row.reservation_id)) map.set(row.reservation_id, toOrderDto(row));
   return map;
 }
 
-/** Moves an order to `to` if its status is one of `from`; false when another request was first. */
-async function moveOrder(db: D1Database, id: string, from: OrderStatus[], to: OrderStatus, set: Record<string, string | null> = {}): Promise<boolean> {
+/**
+ * Moves an order to `to` if its status is one of `from` (and the optional SQL guard holds); false
+ * when another request was first or the guard failed.
+ */
+async function moveOrder(
+  db: D1Database,
+  id: string,
+  from: OrderStatus[],
+  to: OrderStatus,
+  set: Record<string, string | null> = {},
+  guard = "",
+): Promise<boolean> {
   const columns = Object.keys(set);
   const assignments = ["status = ?", ...columns.map((c) => `${c} = ?`)].join(", ");
   const result = await db
-    .prepare(`UPDATE orders SET ${assignments} WHERE id = ? AND status IN (${from.map(() => "?").join(", ")})`)
+    .prepare(`UPDATE orders SET ${assignments} WHERE id = ? AND status IN (${from.map(() => "?").join(", ")})${guard}`)
     .bind(to, ...columns.map((c) => set[c]!), id, ...from)
     .run();
   return result.meta.changes === 1;
+}
+
+/** v7 R3.2: "paid" only while the booking is live, checked in the same UPDATE. */
+const RESERVATION_ACTIVE = " AND EXISTS (SELECT 1 FROM reservations r WHERE r.id = orders.reservation_id AND r.status IN ('pending', 'confirmed'))";
+
+/**
+ * Closes a booking's unfinished checkouts and their Stripe pages (best effort): before a new one,
+ * and after a cancel, so a cancelled booking cannot be paid from an open tab (v7 R3.4).
+ */
+export async function closeOpenCheckouts(db: D1Database, reservationId: string): Promise<void> {
+  const { results } = await db
+    .prepare("SELECT * FROM orders WHERE reservation_id = ? AND status = 'checkout'")
+    .bind(reservationId)
+    .all<OrderRow>();
+  for (const order of results) {
+    await moveOrder(db, order.id, ["checkout"], "expired");
+    if (order.checkout_session_id) await payments.expireCheckout(order.checkout_session_id).catch(() => {});
+  }
 }
 
 // --- Notifications -------------------------------------------------------------------------
@@ -195,14 +229,7 @@ export async function createOrder(db: D1Database, token: string, input: OrderInp
   const priced = priceOrder(input.items);
 
   // A new "Pay" replaces an unfinished checkout; its Stripe page is closed too (best effort).
-  const { results: open } = await db
-    .prepare("SELECT * FROM orders WHERE reservation_id = ? AND status = 'checkout'")
-    .bind(reservation.id)
-    .all<OrderRow>();
-  for (const old of open) {
-    await moveOrder(db, old.id, ["checkout"], "expired");
-    if (old.checkout_session_id) await payments.expireCheckout(old.checkout_session_id).catch(() => {});
-  }
+  await closeOpenCheckouts(db, reservation.id);
 
   const id = crypto.randomUUID();
   await db
@@ -214,8 +241,9 @@ export async function createOrder(db: D1Database, token: string, input: OrderInp
     .run();
 
   const prefix = input.locale === "en" ? "" : `/${input.locale}`;
+  let session: { id: string; url: string } | undefined;
   try {
-    const session = await payments.createCheckout({
+    session = await payments.createCheckout({
       orderId: id,
       reservationId: reservation.id,
       currency: CURRENCY,
@@ -233,6 +261,8 @@ export async function createOrder(db: D1Database, token: string, input: OrderInp
     return { url: session.url };
   } catch (error) {
     await moveOrder(db, id, ["checkout"], "expired");
+    // Stripe created a page we could not store: close it, so nothing untracked can be paid (v7 R3.5).
+    if (session) await payments.expireCheckout(session.id).catch(() => {});
     throw error;
   }
 }
@@ -265,6 +295,9 @@ async function refundPayment(
 /**
  * Stripe says the order is paid (webhook or return check). Repeated news changes nothing. A payment
  * for a booking that is no longer active, or a second payment of one booking, is refunded at once (P8).
+ * The booking's state is checked inside the UPDATE, not on an earlier read, so a cancel racing with
+ * the payment cannot leave money on a cancelled booking (v7 R3.2). A payment that arrives after the
+ * start still counts while the booking is live: its session was opened before the start (v7 R3.1).
  */
 export async function recordPayment(db: D1Database, orderId: string, paymentIntentId: string | null, now: Date, telegram: TelegramConfig): Promise<void> {
   const order = await findOrder(db, orderId);
@@ -273,18 +306,20 @@ export async function recordPayment(db: D1Database, orderId: string, paymentInte
   const reservation = await findById(db, order.reservation_id);
   if (!reservation) return;
 
-  if (ACTIVE_STATUSES.includes(reservation.status) && !started(reservation, now)) {
-    try {
-      if (await moveOrder(db, order.id, ["checkout", "expired"], "paid", { payment_intent_id: paymentIntentId, paid_at: now.toISOString() })) {
-        noticeInBackground(telegram, "paid", reservation, order);
-      }
+  try {
+    if (await moveOrder(db, order.id, ["checkout", "expired"], "paid", { payment_intent_id: paymentIntentId, paid_at: now.toISOString() }, RESERVATION_ACTIVE)) {
+      noticeInBackground(telegram, "paid", reservation, order);
       return;
-    } catch (error) {
-      // The unique index: this booking already has a paid order, so this payment is a second one.
-      if (!String(error).includes("UNIQUE")) throw error;
     }
+  } catch (error) {
+    // The unique index: this booking already has a paid order, so this payment is a second one.
+    if (!String(error).includes("UNIQUE")) throw error;
   }
-  await refundPayment(db, order, paymentIntentId, ["checkout", "expired"], now, telegram, reservation);
+  // Nothing changed: either another request already recorded this payment (then stop), or the
+  // booking is no longer live / already paid (then refund this payment).
+  const fresh = await findOrder(db, order.id);
+  if (fresh?.status !== "checkout" && fresh?.status !== "expired") return;
+  await refundPayment(db, fresh, paymentIntentId, ["checkout", "expired"], now, telegram, reservation);
 }
 
 /** Stripe closed the session unpaid. */
@@ -318,6 +353,7 @@ export async function orderForGuest(db: D1Database, reservationId: string, now: 
 
 /** After a guest's cancellation (page, scripted or AI chat): refund a paid pre-order (P9). */
 export async function refundAfterGuestCancel(db: D1Database, reservation: ReservationRow, now: Date, telegram: TelegramConfig): Promise<void> {
+  await closeOpenCheckouts(db, reservation.id);
   const order = await db.prepare("SELECT * FROM orders WHERE reservation_id = ? AND status = 'paid'").bind(reservation.id).first<OrderRow>();
   if (!order?.payment_intent_id) return;
   await refundPayment(db, order, order.payment_intent_id, ["paid"], now, telegram, reservation);

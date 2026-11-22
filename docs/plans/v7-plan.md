@@ -182,3 +182,28 @@ such an order would stay unpaid.
 `allowed_payment_method_types: ["card"]`: from Stripe API version `2026-09-30` the older
 `payment_method_types` cannot be passed (Stripe docs, "Restrict payment methods in code"). The demo stays
 on the clear path card → paid → refund. Docs: `docs/api.md` (pre-order), ADR-028.
+
+## Revision R3 (2026-11-22) — code review fixes (approved)
+
+**Trigger:** the Phase 7.1 review of `main...feature/v7-prepayment` found 8 issues, all confirmed
+against the code. Decisions (user): accept a payment that was started before the booking began;
+fix 1–5, 7, 8; leave 6.
+
+- **R3.1 Late payment refunded.** A payment is judged by the reservation's state, not by the time
+  the news arrives: it counts while the booking is active (pending / confirmed), also after the
+  start, as the session was opened before it. New payments can still start only before the start.
+- **R3.2 Race between payment and cancel.** "Paid" is set by one conditional UPDATE that also
+  requires the reservation to be active; when it changes nothing, the payment is refunded. No
+  decision is taken on an earlier read.
+- **R3.3 500 after a real cancel.** The refund after a guest cancel no longer fails the request:
+  errors are logged; a failed refund is already visible as `refund_failed` and ⚠️ in Telegram.
+- **R3.4 Open checkout after a cancel.** A cancel (guest or café) moves the booking's unfinished
+  checkouts to `expired` and closes their Stripe pages (best effort).
+- **R3.5 Untracked Stripe page.** If storing the session id fails after Stripe created the session,
+  the session is closed at Stripe too.
+- **R3.6 (left as is)** the return check on page load has no own rate limit: it needs the token.
+- **R3.7 D1 bound parameters.** The admin day list reads orders with one query by date (no list of
+  ids, which D1 limits to 100 parameters).
+- **R3.8 Hidden failed refund.** The admin shows a `refund_failed` order before a `paid` one.
+
+Tests for R3.1–R3.5 and R3.8; R3.7 is covered by the admin day tests.

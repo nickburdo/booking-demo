@@ -98,7 +98,12 @@ app.get("/reservations/:token", async (req, res) => {
 /** A guest cancelled (page, scripted or AI chat): tell the owner, refund a paid pre-order (v7 P9). */
 async function afterGuestCancel(row: ReservationRow): Promise<void> {
   notifyInBackground(env.DB, telegramConfig(), "cancelled", row, clock.now);
-  await refundAfterGuestCancel(env.DB, row, clock.now(), telegramConfig());
+  try {
+    await refundAfterGuestCancel(env.DB, row, clock.now(), telegramConfig());
+  } catch (error) {
+    // The cancel itself is done; a failed refund is visible as refund_failed / ⚠️ (v7 R3.3).
+    console.error(`Refund after the cancel of ${row.id} failed:`, error);
+  }
 }
 
 app.post("/reservations/:token/cancel", async (req, res) => {

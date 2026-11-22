@@ -331,3 +331,98 @@ describe("reminder at booking (D3)", () => {
     expect(TEXTS.uk.preorderHint).toContain("20%");
   });
 });
+
+describe("code review fixes (v7 R3)", () => {
+  /** A temporary SQLite trigger that makes one kind of write fail, to simulate a D1 error. */
+  async function failWrites(name: string, when: string) {
+    await env.DB.prepare(`CREATE TRIGGER ${name} BEFORE UPDATE ON orders WHEN ${when} BEGIN SELECT RAISE(ABORT, 'simulated D1 failure'); END`).run();
+    return () => env.DB.prepare(`DROP TRIGGER IF EXISTS ${name}`).run();
+  }
+
+  it("R3.1: accepts a payment started before the booking and finished after its start", async () => {
+    const made = await confirmedBooking("12:00");
+    pinClock(new Date(`${THURSDAY}T09:50:00Z`)); // 11:50 in Kyiv: Pay is pressed
+    await order(made.token);
+    const row = await orderRow();
+    pinClock(new Date(`${THURSDAY}T10:02:00Z`)); // 12:02: the card is entered, the webhook arrives
+    await webhook(sessionEvent("checkout.session.completed", { id: row.checkout_session_id, orderId: row.id, paymentIntent: "pi_late_ok" }));
+    expect((await orderRow()).status).toBe("paid");
+    expect(outbound.stripe.refunds).toHaveLength(0);
+  });
+
+  it("R3.2: refunds a payment whose booking is no longer live when the payment is written", async () => {
+    // The booking's state is checked in the same UPDATE that marks the order paid.
+    const made = await confirmedBooking();
+    await order(made.token);
+    const row = await orderRow();
+    await env.DB.prepare("UPDATE reservations SET status = 'no_show'").run();
+    await webhook(sessionEvent("checkout.session.completed", { id: row.checkout_session_id, orderId: row.id, paymentIntent: "pi_race" }));
+    expect((await orderRow()).status).toBe("refunded");
+    expect(outbound.stripe.refunds.map((r) => r.paymentIntentId)).toEqual(["pi_race"]);
+  });
+
+  it("R3.2: a repeated payment notice after the first one changes nothing and refunds nothing", async () => {
+    const made = await confirmedBooking();
+    await order(made.token);
+    const row = await orderRow();
+    const event = sessionEvent("checkout.session.completed", { id: row.checkout_session_id, orderId: row.id, paymentIntent: "pi_once" });
+    await webhook(event);
+    outbound.stripe.sessions.set(row.checkout_session_id, { id: row.checkout_session_id, status: "complete", paid: true, paymentIntentId: "pi_once", orderId: row.id });
+    await reservationOf(made.token); // the return check sees the same payment
+    expect((await orderRow()).status).toBe("paid");
+    expect(outbound.stripe.refunds).toHaveLength(0);
+  });
+
+  it("R3.3: the guest's cancel succeeds even if recording the refund fails", async () => {
+    const made = await paidBooking();
+    const restore = await failWrites("fail_refund", "NEW.status IN ('refunded', 'refund_failed')");
+    try {
+      const res = await call(`/reservations/${made.token}/cancel`, { method: "POST" });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as any).reservation.status).toBe("cancelled");
+    } finally {
+      await restore();
+    }
+  });
+
+  it("R3.4: a cancel closes the booking's open checkout and its Stripe page (guest and café)", async () => {
+    const guest = await confirmedBooking("15:00");
+    await order(guest.token);
+    await call(`/reservations/${guest.token}/cancel`, { method: "POST" });
+    expect((await orderRow()).status).toBe("expired");
+    expect(outbound.stripe.expired).toEqual(["cs_test_1"]);
+
+    const cafe = await confirmedBooking("18:00");
+    await order(cafe.token);
+    await admin(`/admin/reservations/${cafe.reservation.id}/cancel`, await adminToken());
+    expect((await orderRow()).status).toBe("expired");
+    expect(outbound.stripe.expired).toEqual(["cs_test_1", "cs_test_2"]);
+  });
+
+  it("R3.5: closes Stripe's page when its id cannot be stored", async () => {
+    const made = await confirmedBooking();
+    const restore = await failWrites("fail_session_id", "NEW.checkout_session_id IS NOT NULL");
+    try {
+      const res = await order(made.token);
+      expect(res.status).toBe(500);
+      expect((await orderRow()).status).toBe("expired");
+      expect(outbound.stripe.expired).toEqual(["cs_test_1"]);
+    } finally {
+      await restore();
+    }
+  });
+
+  it("R3.8: the admin shows a failed refund before the paid order", async () => {
+    const made = await confirmedBooking();
+    await order(made.token);
+    const first = await orderRow();
+    await order(made.token);
+    const second = await orderRow();
+    await webhook(sessionEvent("checkout.session.completed", { id: second.checkout_session_id, orderId: second.id, paymentIntent: "pi_a" }));
+    outbound.stripe.failRefund = true;
+    await webhook(sessionEvent("checkout.session.completed", { id: first.checkout_session_id, orderId: first.id, paymentIntent: "pi_b" }));
+    const day = await admin(`/admin/reservations?date=${THURSDAY}`, await adminToken(), "GET");
+    expect(day.body.reservations[0].order.status).toBe("refund_failed");
+    expect((await reservationOf(made.token)).order.status).toBe("paid");
+  });
+});

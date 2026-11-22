@@ -449,8 +449,11 @@ secret. Handled events: `checkout.session.completed` (→ `paid`) and `checkout.
 
 ### Side effects
 
-- Paid while the booking is no longer active (cancelled meanwhile, or started): the payment is
-  recorded and refunded at once.
+- Paid while the booking is no longer active (cancelled or marked no-show meanwhile): the payment
+  is recorded and refunded at once. A payment that arrives after the start still counts while the
+  booking is live: its session was opened before the start (v7 R3.1).
+- A cancel (by the guest or the café) closes the booking's unfinished checkout and its Stripe page
+  (v7 R3.4).
 - Telegram to the owner: 💳 order paid (dishes, amount), ↩️ refunded, ⚠️ refund failed.
 
 ## How double booking is prevented
