@@ -1,6 +1,6 @@
 # v5 plan — Scripted chat on the same API
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R2
 - **Scope:** stage v5 of the roadmap (`docs/overview.md`): a chat widget on the landing page.
   The dialogue runs **on the server** as a scripted state machine (no AI) and uses the same
   booking services and rules as the form. The guest answers with buttons and a few text

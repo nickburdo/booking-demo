@@ -27,6 +27,13 @@ for the guest) or marks a no-show. The guest's reservation page shows what the c
 on the login page). Guest names and phones are partly hidden there, and a button adds
 made-up demo reservations.
 
+v5 is live: a **chat** on the landing page ("Chat with us" in the corner). It is scripted — no
+AI — and runs on the server: it books a table, finds a booking from its link (and cancels it),
+answers about hours, address and menu, and passes a question to the café. It uses the same
+booking rules as the form. Conversations are shown in the admin ("Chats" tab), with names and
+phones hidden. The chat has a second tab, **AI**, which says "coming soon": the AI chat of v6
+will appear next to the scripted one, so the two can be compared.
+
 ## Demo limitations
 
 This is a demo, so some things a real booking service would do are left out on purpose:
@@ -37,6 +44,9 @@ This is a demo, so some things a real booking service would do are left out on p
 | A booking can be found **only by its private link** | A guest account, or a lookup by phone confirmed with an SMS code — a lookup by phone alone would show other people's bookings |
 | The **admin is open to everyone** (demo login) and shows guest data masked; anyone can confirm or cancel | A private login for the staff only, who see full guest details |
 | **Telegram messages go only to the owner** (new and cancelled bookings), not for admin actions | Messages for the staff on every change, and to guests if they opted in |
+| The chat's **"ask a person"** sends the question to the owner's Telegram, but **nobody calls back** | A real hand-off: staff answer in the chat or call the guest |
+| **Chat conversations are visible in the public admin** (names and phones hidden) and deleted after 7 days | Only staff see them; retention follows a privacy policy |
+| The chat is **scripted**: buttons and a few fields, no free text | v6 adds an AI chat that understands free text, next to the scripted one |
 
 ## Roadmap
 
@@ -46,7 +56,7 @@ This is a demo, so some things a real booking service would do are left out on p
 | v2 | API + database: tables, slots, reservations, double-booking protection | ✅ Done |
 | v3 | Booking form + Telegram notification to the owner | ✅ Done |
 | v4 | Admin: list reservations, confirm/cancel | ✅ Done |
-| v5 | Scripted chat (no AI) on the same API | Planned |
+| v5 | Scripted chat (no AI) on the same API | ✅ Done |
 | v6 | AI chat calling the same API via tool calls | Planned |
 | v7 | Prepayment in a payment provider's test mode | Planned |
 
@@ -68,8 +78,10 @@ This is a demo, so some things a real booking service would do are left out on p
 
 ```
 apps/
-  web/        Nuxt site: landing (v1), booking form and reservation page (v3), admin (v4)
-  api/        Express booking API on Workers + D1 (v2), Telegram + Turnstile (v3), admin API (v4)
+  web/        Nuxt site: landing (v1), booking form and reservation page (v3), admin (v4), chat widget (v5)
+  api/        Express booking API on Workers + D1 (v2), Telegram + Turnstile (v3), admin API (v4), chat (v5)
+packages/
+  cafe-data/  café content (name, address, hours, menu) shared by the site and the API (v5)
 docs/
   overview.md       goals and roadmap
   api.md            booking API contract and examples

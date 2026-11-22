@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1–v4 implemented, v5 planned** (2026-11-21). Parts are marked with the
+Status: **target architecture; v1–v5 implemented** (2026-11-21). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -215,7 +215,7 @@ Learned in v4:
 - A public admin demo shapes the product: no messages to guests, masked data, and an honest
   "demo limitations" note instead of features that would be risky with strangers in the admin.
 
-## Scripted chat (v5) — planned
+## Scripted chat (v5) — implemented
 
 Plan: `docs/plans/v5-plan.md`. Contract: `docs/api.md` → Chat. Decisions: ADR-023 … ADR-025.
 
@@ -226,3 +226,24 @@ Plan: `docs/plans/v5-plan.md`. Contract: `docs/api.md` → Chat. Decisions: ADR-
   `chat_messages`); `CHAT_LIMITER` binding; admin endpoints `/admin/chats…` with masking.
 - Web: `ChatWidget.vue` on the landing page (Turnstile at the start, renders bot turns, token in
   `sessionStorage`); admin "Chats" tab with the list and transcripts.
+- The widget has "Scripted | AI" tabs; the AI tab is "coming soon" (v5 R1): v6 adds the AI
+  engine next to the scripted one, with the same turn shape and the same services.
+- Conversations never store reservation tokens: links are saved as `…/reservation#••••`.
+
+Learned in v5:
+- A scripted dialogue is easiest to test as a pure step machine (state + input → state + turn +
+  effects) with the booking services injected; the HTTP layer only stores turns and runs effects.
+- Bumping a version to "claim" a step is not enough when the state itself still says "ready":
+  a later request reads the new version and the old state. The claim must change the state too
+  (a "busy" mark), and a mark needs an expiry for requests that die half-way (found in review).
+- Side effects (a booking, a Telegram message) that happen before the turn is saved must not be
+  lost or repeated when the save fails: answer with the result anyway.
+- Anything shown in a public admin must be checked for secrets, not only for personal data: the
+  bot's own message carried the guest's private link (found in review).
+- A shared TypeScript workspace package compiles from source in both Vite (Nuxt) and esbuild
+  (Wrangler) with no extra config; `exports` pointing at `.ts` is enough.
+- In JavaScript, `\b` in a regular expression only knows ASCII letters; it does not match after
+  Cyrillic words.
+- `wrangler dev` exposes a local D1 explorer API (`/cdn-cgi/local/explorer/api/d1/…/raw`), handy
+  for preparing states in browser tests (e.g. an expired conversation).
+
