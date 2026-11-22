@@ -3,7 +3,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DAILY_NEURON_BUDGET, utcDay } from "../src/chat/ai/budget";
-import { AiUnavailableError, normaliseReply, type AiReply } from "../src/chat/ai/model";
+import { AiUnavailableError, normaliseReply, withTimeout, type AiReply } from "../src/chat/ai/model";
 import { maskPhoneLike } from "../src/chat/service";
 import { booking, call, clearReservations, NOW, pinClock, postJson, THURSDAY, waitFor } from "./helpers";
 import { outbound } from "./outbound";
@@ -65,6 +65,14 @@ describe("model adapter", () => {
     const openai = normaliseReply({ choices: [{ message: { content: null, tool_calls: [{ id: "x1", function: { name: "propose_booking<|channel|>analysis", arguments: "{}" } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } });
     expect(openai.toolCalls[0]).toEqual({ id: "x1", name: "propose_booking", arguments: "{}" });
     expect(openai.text).toBe("");
+  });
+});
+
+describe("model call timeout", () => {
+  it("gives up on a stalled call with AiUnavailableError", async () => {
+    const stalled = new Promise<never>(() => {});
+    await expect(withTimeout(stalled, 20)).rejects.toBeInstanceOf(AiUnavailableError);
+    await expect(withTimeout(Promise.resolve(5), 20)).resolves.toBe(5);
   });
 });
 

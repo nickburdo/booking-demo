@@ -61,18 +61,35 @@ export function normaliseReply(raw: unknown): AiReply {
   };
 }
 
+/**
+ * One model call usually takes 2–7 s; Workers AI sometimes stalls for a minute (seen in v6 Phase 4).
+ * After this long the guest gets "the AI is unavailable, try again" instead of waiting (P7).
+ */
+export const MODEL_TIMEOUT_MS = 25_000;
+
+/** Rejects with AiUnavailableError if the promise does not settle in time. */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new AiUnavailableError(false, `model call timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export const aiModel = {
   async run(messages: AiMessage[], tools: AiTool[]): Promise<AiReply> {
     try {
       // The model id is a runtime constant; the binding's typed overloads do not list it.
-      const raw = await (env.AI.run as (model: string, input: unknown) => Promise<unknown>)(AI_MODEL, {
+      const call = (env.AI.run as (model: string, input: unknown) => Promise<unknown>)(AI_MODEL, {
         messages,
         tools,
         max_tokens: 600,
         temperature: 0.2,
       });
+      const raw = await withTimeout(call, MODEL_TIMEOUT_MS);
       return normaliseReply(raw);
     } catch (error) {
+      if (error instanceof AiUnavailableError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       // "You have used up your daily free allocation of 10,000 neurons" (code 3036).
       throw new AiUnavailableError(/3036|free allocation/i.test(message), message);
