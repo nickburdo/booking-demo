@@ -9,6 +9,8 @@ One-time steps for the owner of the deployment. They create the three secrets th
 | `TELEGRAM_CHAT_ID` | Telegram `getUpdates` | **yes** (treat as private) | `wrangler secret put`, optionally `apps/api/.dev.vars` |
 | `TURNSTILE_SECRET` | Cloudflare dashboard | **yes** | `wrangler secret put` only |
 | Turnstile site key | Cloudflare dashboard | no (it is in every page) | `apps/web/nuxt.config.ts` → `runtimeConfig.public.turnstileSiteKey` |
+| `STRIPE_SECRET_KEY` (v7) | Stripe dashboard → Developers → API keys (`sk_test_…`) | **yes** | `wrangler secret put`, `apps/api/.dev.vars` |
+| `STRIPE_WEBHOOK_SECRET` (v7) | Stripe dashboard → Webhooks → endpoint (`whsec_…`) | **yes** | `wrangler secret put`, optionally `apps/api/.dev.vars` |
 
 No need to keep a private copy of the values: each can be found again at its source.
 - Bot token: @BotFather → `/mybots` → the bot → **API Token**.
@@ -183,3 +185,62 @@ no card). Usage is visible in the Cloudflare dashboard under **AI → Workers AI
 Local `wrangler dev` also calls the real models on Cloudflare (the binding always runs remotely),
 so local tries use the same daily free quota. Automated tests never call the models.
 
+
+## 8. Stripe test mode (v7)
+
+The pre-order payments use a **Stripe account in test mode**. Test mode needs no activation, no
+company details and no card; real money never moves. The keys are never pasted in the chat.
+
+### 8.1 Create the account
+
+1. Open https://dashboard.stripe.com/register and sign up with an e-mail.
+2. If Stripe asks for a country and Ukraine is not offered, stop and tell the developer (plan v7,
+   risk R1): the choice affects the currency and the terms.
+3. Do **not** activate the account ("Activate payments"): the demo uses test mode only.
+4. Make sure the dashboard shows **Test mode** (or a sandbox).
+
+### 8.2 Keys for local development
+
+1. In the dashboard open **Developers → API keys**.
+2. Copy the **Secret key** (it starts with `sk_test_`). The publishable key is not needed.
+3. Open `apps/api/.dev.vars` (git-ignored) in an editor and add a line:
+
+   ```
+   STRIPE_SECRET_KEY=sk_test_…
+   ```
+
+4. The webhook secret for local development is optional (see 8.4).
+
+### 8.3 Production secrets and the webhook (at deploy time)
+
+1. In the dashboard open **Developers → Webhooks → Add endpoint**.
+2. Endpoint URL: `https://booking-demo-api.nick-burdo.workers.dev/payments/stripe/webhook`.
+3. Events: `checkout.session.completed` and `checkout.session.expired`.
+4. Save, then open the endpoint and reveal its **Signing secret** (starts with `whsec_`).
+5. In a terminal in `apps/api`, store both secrets as in section 4 (the value is pasted at the
+   prompt, never typed into the command):
+
+   ```sh
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+
+6. Check with `npx wrangler secret list`.
+
+### 8.4 Optional: webhooks on the local API
+
+Without this, the local API learns about a payment when the guest returns to the reservation page.
+To receive real webhooks locally, install the Stripe CLI (https://docs.stripe.com/stripe-cli), then:
+
+```sh
+stripe login
+stripe listen --forward-to localhost:8787/payments/stripe/webhook
+```
+
+It prints a signing secret (`whsec_…`); put it into `apps/api/.dev.vars` as
+`STRIPE_WEBHOOK_SECRET=…` and restart the local API.
+
+### 8.5 Test cards
+
+- `4242 4242 4242 4242` — paid; any future date, any CVC.
+- `4000 0000 0000 0002` — declined.

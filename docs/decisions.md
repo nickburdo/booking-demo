@@ -308,3 +308,39 @@ has confirmed it in discussion.
   while the scripted chat keeps working. Local development uses the same real quota, because the
   AI binding always runs on Cloudflare.
 
+
+## ADR-028 — Payments: Stripe Checkout (hosted page) in test mode
+
+- **Status:** Accepted (2026-11-22, v7 plan)
+- **Decision:** Pre-orders are paid on **Stripe Checkout**, Stripe's hosted payment page, in **test
+  mode only**. The API creates a Checkout Session from prices it takes itself from
+  `packages/cafe-data` (the browser sends only dish ids and quantities), sends the guest to Stripe's
+  page and back to the reservation page. The API learns the result in two idempotent ways: a
+  signed webhook (`checkout.session.completed` / `expired`, signature checked with
+  `constructEventAsync` and Web Crypto) and a check of the session when the guest returns. Order
+  status changes are conditional updates, so repeated or late events change nothing. Refunds use
+  `refunds.create` by payment intent. All Stripe calls go through one adapter (the official
+  `stripe` package with its fetch HTTP client); the API refuses to work with a key that is not
+  `sk_test_…`. Keys are Worker secrets.
+- **Why:** A hosted page keeps card data away from the demo and is the same pattern most providers
+  use (create → pay at the provider → signed notification → our status), which is what v7 is
+  about. Stripe has test mode without account activation and the best documentation. monobank and
+  LiqPay were considered (test tokens, UAH) and stay as fallbacks.
+- **Consequences:** No real money ever moves; anyone can pay with test cards in the public demo.
+  Without a webhook tunnel, local development still works through the return check.
+
+## ADR-029 — Prepayment rules
+
+- **Status:** Accepted (2026-11-22, v7 plan)
+- **Decision:** A pre-order of dishes exists only together with payment and gets **20% off**. It is
+  possible on the reservation page after the café **confirmed** the booking and before it starts;
+  at most one paid order per booking; a paid order cannot be changed. After payment the café can no
+  longer cancel the booking (`409 PAID_BOOKING`), but can still mark a no-show, and a no-show keeps
+  the payment. A guest's cancellation (page, scripted chat or AI chat) refunds the payment in full;
+  a payment that arrives for a booking that is no longer active is refunded at once. The owner gets
+  Telegram messages about payments, refunds and failed refunds. The guest is reminded about the
+  option when a booking is made.
+- **Why:** The user wants to try a general prepayment mechanism; business details (late
+  cancellation fees, partial refunds, order changes) are left out on purpose.
+- **Consequences:** Guest cancellation becomes a two-step operation (cancel, then refund); a failed
+  refund is visible to the owner and in the admin instead of being silent.

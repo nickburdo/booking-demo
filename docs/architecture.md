@@ -277,3 +277,15 @@ Learned in v6:
   patterns, names cannot — be honest about it in the notice instead (R3).
 - `Date.now()` at a Worker's module scope reads 1970; compute dates inside handlers.
 
+## Pre-order with prepayment (v7) — planned
+
+Plan: `docs/plans/v7-plan.md`. Contract: `docs/api.md` → Pre-order and prepayment. Decisions:
+ADR-028, ADR-029.
+
+- API: `src/payments.ts` — adapter over the `stripe` package (Checkout Sessions, refunds, webhook
+  signature check, test-mode guard); migration `0007` (`orders`); `POST /reservations/:token/order`,
+  `order` in the reservation (with the return check), `POST /payments/stripe/webhook`; refund in
+  the shared guest cancel path; admin refuses "Cancel" for a paid booking; Telegram 💳 / ↩️ / ⚠️.
+- Web: a pre-order block on the reservation page (menu, totals with 20% off, "Pay" → Stripe's
+  page → back); payment states; reminders at booking; admin paid tag and order.
+- Secrets: `STRIPE_SECRET_KEY` (`sk_test_…`), `STRIPE_WEBHOOK_SECRET`.

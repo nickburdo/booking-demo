@@ -74,10 +74,14 @@ The single backend for every booking interface: the form (v3), the admin (v4) an
 | 401 | `CHAT_EXPIRED` | Chat request without a valid chat token (missing, unknown or silent for 2 hours) — start a new conversation (v5) |
 | 409 | `CHAT_CONFLICT` | Two chat messages for the same step at once; reload the conversation (v5) |
 | 409 | `CHAT_LIMIT` | The conversation reached 60 guest messages (v5; 20 in an AI conversation, v6) |
+| 409 | `ORDER_NOT_ALLOWED` | Pre-order for a booking that is not `confirmed`, has started, or is already paid (v7) |
+| 409 | `PAID_BOOKING` | Admin cancel of a booking with a paid pre-order (v7) |
+| 400 | `WEBHOOK_SIGNATURE` | Stripe webhook with a missing or invalid signature (v7) |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body larger than 10 KB |
 | 429 | `RATE_LIMITED` | Too many create (or, v4, admin login / demo data; v5, chat) requests from this IP |
 | 500 | `INTERNAL` | Unexpected error (no details exposed) |
 | 503 | `VERIFICATION_UNAVAILABLE` | Turnstile could not be reached; the booking is refused, try again (v3) |
+| 503 | `PAYMENTS_UNAVAILABLE` | Stripe could not be reached, or the API has no test-mode key (`sk_test_…`) (v7) |
 
 ## Reservation object
 
@@ -201,6 +205,10 @@ curl https://booking-demo-api.nick-burdo.workers.dev/reservations/<token>
 
 `200` → `{ "reservation": { … } }`. Errors: `404 NOT_FOUND`.
 
+From v7 the answer also has `order` (the pre-order, or `null`), see
+[Pre-order and prepayment (v7)](#pre-order-and-prepayment-v7). If the order is still `checkout`,
+the API first asks Stripe for its Checkout Session and records the result (the return check).
+
 ### `POST /reservations/:token/cancel`
 
 Allowed while the reservation is `pending` (from v4 also `confirmed`) and has not started.
@@ -219,6 +227,9 @@ curl -X POST https://booking-demo-api.nick-burdo.workers.dev/reservations/<token
 Errors: `404 NOT_FOUND`, `409 NOT_CANCELLABLE`.
 
 Side effect (v3): a Telegram message to the owner about the cancellation (best effort).
+
+From v7: if the booking has a paid pre-order, the payment is refunded after the cancellation
+(the same in the scripted and the AI chat).
 
 ## Admin (v4)
 
@@ -280,6 +291,9 @@ the demo-data button. Errors: `400 VALIDATION`, `401 UNAUTHORIZED`.
 on the reservation page. Each returns `200 { "reservation": { … } }` (admin shape, as in the
 list). Cancel and no-show free the table. Errors: `400 VALIDATION`, `401 UNAUTHORIZED`,
 `404 NOT_FOUND`, `409 NOT_ALLOWED`.
+
+From v7 each admin reservation also has `order` (as in [Order object](#order-object), or `null`),
+and `cancel` of a booking with a paid order answers `409 PAID_BOOKING`; `no-show` stays allowed.
 
 ### `POST /admin/demo-reservations`
 
@@ -370,6 +384,68 @@ text that never reaches a proposal cannot be found reliably, so the AI tab's dem
 phones are hidden and asks for no personal details beyond the name and phone a booking needs
 (v6 R3.6). Reservation tokens written anywhere in an AI message are stored as `••••` (v6 R3.1). Conversations older than 7 days are deleted. Errors: `401 UNAUTHORIZED`,
 `404 NOT_FOUND`.
+
+## Pre-order and prepayment (v7)
+
+After the café confirms a booking, the guest can pre-order dishes on the reservation page and pay
+online with **20% off**. Payments run on **Stripe Checkout in test mode** (Stripe's hosted page;
+test cards only, no real money). Decisions: ADR-028, ADR-029.
+
+### Order object
+
+```json
+{
+  "status": "paid",
+  "items": [
+    { "id": "cappuccino", "name": "Cappuccino", "quantity": 2, "price": 75 },
+    { "id": "croissant", "name": "Croissant", "quantity": 1, "price": 65 }
+  ],
+  "total": 215,
+  "discountPercent": 20,
+  "amount": 172,
+  "currency": "uah",
+  "paidAt": "2026-11-28T09:12:00.000Z",
+  "refundedAt": null
+}
+```
+
+`price` and `total` are full prices in hryvnias; `amount` is what is charged (after the discount).
+Item names are stored in English and shown on the site from the menu in the page's language.
+
+```
+checkout ──(Stripe: completed)──▶ paid ──(guest cancels)──▶ refunded
+                                          └─(refund fails)──▶ refund_failed
+checkout ──(Stripe: expired, or a new "Pay")──▶ expired
+```
+
+A booking has at most one `paid` order. A paid order cannot be changed.
+
+### `POST /reservations/:token/order`
+
+Body: `{ "items": [{ "itemId": "cappuccino", "quantity": 2 }, …], "locale": "ru" }` — 1 to 10 of
+each dish, at least one dish, ids from the menu (`packages/cafe-data`). Prices are taken on the
+server; `locale` picks the language of Stripe's page and of the return URL. Allowed for a
+`confirmed` booking that has not started and has no paid order; an unfinished `checkout` order is
+replaced.
+
+`200` → `{ "url": "https://checkout.stripe.com/…" }` — the guest's browser goes there and comes back
+to the reservation page. The session expires after 30 minutes.
+
+Errors: `400 VALIDATION`, `404 NOT_FOUND`, `409 ORDER_NOT_ALLOWED`, `503 PAYMENTS_UNAVAILABLE`.
+
+### `POST /payments/stripe/webhook`
+
+For Stripe only. The raw body is checked against the `Stripe-Signature` header with the webhook
+secret. Handled events: `checkout.session.completed` (→ `paid`) and `checkout.session.expired`
+(→ `expired`); others are acknowledged and ignored. Changes are conditional (`… WHERE status =
+'checkout'`), so a repeated or late event changes nothing. `200 { "received": true }`; errors:
+`400 WEBHOOK_SIGNATURE`.
+
+### Side effects
+
+- Paid while the booking is no longer active (cancelled meanwhile, or started): the payment is
+  recorded and refunded at once.
+- Telegram to the owner: 💳 order paid (dishes, amount), ↩️ refunded, ⚠️ refund failed.
 
 ## How double booking is prevented
 
