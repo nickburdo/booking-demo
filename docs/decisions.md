@@ -242,8 +242,9 @@ has confirmed it in discussion.
 - **Alternatives rejected:** a state machine in the browser calling the public endpoints
   (simpler now, but v6 needs the dialogue on the server for the AI key, and texts would be
   split); free-text rules (many "did not understand" replies — the problem v6 solves).
-- **Consequences:** v6 can replace the engine with an AI that returns the same turn shape and
-  calls the same services as tools. Chat texts live in the API, not in the site's locale files.
+- **Consequences:** v6 adds an AI engine **next to** the scripted one (v5 plan, R1: the widget
+  has "Scripted | AI" tabs, so both chats can be compared); the AI returns the same turn shape
+  and calls the same services as tools. Chat texts live in the API, not in the site's locale files.
   The Turnstile check at the start of a conversation covers bookings made in it.
 
 ## ADR-024 — Chat conversations: storage, privacy and limits

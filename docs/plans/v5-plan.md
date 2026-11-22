@@ -124,3 +124,20 @@
 ### 6.2 README (status, chat, demo limitations), `docs/architecture.md` (v5 implemented,
   learned), this plan → Done.
 ### 6.3 Merge into `main`, push (ask first, separate commands); delete the branch.
+
+## Revision R1 (2026-11-22) — scripted and AI chats side by side (approved)
+
+**Trigger:** after the live check (5.4) the user proposed to keep the scripted chat in v6 and show
+both chats, instead of replacing one with the other.
+
+**Decision (user):**
+- R1.1 The widget gets two tabs under its header: "Scripted" (default) and "AI".
+- R1.2 The AI tab says "coming soon" (what it will do, that it is v6 of the roadmap) with a button
+  back to the scripted chat; no bot check and no API calls there.
+- R1.3 Texts in EN/RU/UK; tabs follow the tablist keyboard pattern (arrows, Tab); switching tabs
+  keeps the scripted conversation.
+- R1.4 ADR-023: v6 adds the AI engine next to the scripted one (not instead of it); the README
+  mentions the second tab (6.2).
+
+**Done when:** R1.1–R1.3 checked on the built site; ADR-023 updated; README in 6.2.
+

@@ -272,6 +272,17 @@
       "VERIFICATION_UNAVAILABLE": "The bot check is unavailable right now. Try again in a minute.",
       "botCheck": "The bot check could not load. Disable content blockers for this site or try later.",
       "generic": "Something went wrong. Please try again."
+    },
+    "tabs": {
+      "label": "Chat type",
+      "scripted": "Scripted",
+      "ai": "AI"
+    },
+    "ai": {
+      "title": "Coming soon",
+      "text": "The same chat, but with AI: it will understand free text (\"a table for four tomorrow at 7\") and book through the same rules as the scripted chat and the form.",
+      "note": "Demo roadmap: version 6 of this project. Both chats will stay, so you can compare them.",
+      "toScripted": "Try the scripted chat"
     }
   }
 }

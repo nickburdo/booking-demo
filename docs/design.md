@@ -160,6 +160,9 @@ Checked widths in step 6.1: 375, 768, 1280.
   - **Panel:** 380 × 600px milk card, radius 16px, soft shadow, above the page in the corner;
     full screen below `md`. Espresso header with "Linden Coffee" (Unbounded 700 16px), a small
     "Chat bot · demo" line and a close button (outline on espresso). Esc closes.
+  - **Tabs (v5 R1):** "Scripted | AI" on a white strip under the header, active tab underlined in
+    linden (like the admin tabs). The AI tab shows "Coming soon" (Unbounded 700 18px), a short
+    description, a dashed demo note and a button back to the scripted chat.
   - **Start screen:** demo note, "Quick check that you're not a bot", the Turnstile widget.
   - **Messages:** bot = white bubble with a 1px `line` border (tail corner bottom-left); guest =
     espresso bubble with milk text, right-aligned (tail bottom-right); 15.5px text, line breaks

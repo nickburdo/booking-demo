@@ -17,6 +17,24 @@ const error = ref<string | null>(null)
 const endedReason = ref<'expired' | 'limit' | null>(null)
 const draft = ref('')
 
+// v5 R1: both chats side by side — the scripted one works, the AI one is "coming soon" (v6).
+type Tab = 'scripted' | 'ai'
+const tab = ref<Tab>('scripted')
+const TABS: Tab[] = ['scripted', 'ai']
+const tabButtons = ref<HTMLButtonElement[]>([])
+function selectTab(next: Tab, focus = false) {
+  tab.value = next
+  if (focus) nextTick(() => tabButtons.value[TABS.indexOf(next)]?.focus())
+  if (next === 'scripted') scrollAndFocus()
+}
+// Tablist keyboard pattern: arrows move between tabs.
+function onTabKeydown(event: KeyboardEvent) {
+  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+  event.preventDefault()
+  const i = TABS.indexOf(tab.value)
+  selectTab(TABS[(i + (event.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]!, true)
+}
+
 const panel = ref<HTMLElement>()
 const scroller = ref<HTMLElement>()
 const launcher = ref<HTMLButtonElement>()
@@ -35,6 +53,7 @@ const isDemoNote = (m: ChatMessage) => m.sender === 'bot' && /^(Demo|Демо):/
 
 async function scrollAndFocus() {
   await nextTick()
+  if (tab.value !== 'scripted') return
   scroller.value?.scrollTo({ top: scroller.value.scrollHeight })
   // Focus moves to the new question: the text field, or the first choice.
   const target = panel.value?.querySelector<HTMLElement>('[data-chat-focus]')
@@ -216,6 +235,37 @@ onBeforeUnmount(() => (document.documentElement.style.overflow = ''))
         <button type="button" class="flex size-9 items-center justify-center rounded-lg border-[1.5px] border-milk/40 text-lg" :aria-label="t('chat.close')" @click="closeChat">✕</button>
       </header>
 
+      <!-- v5 R1: Scripted | AI tabs; the scripted conversation stays as it is while the AI tab is shown -->
+      <div role="tablist" :aria-label="t('chat.tabs.label')" class="flex gap-1 border-b border-line bg-white px-3 pt-1.5" @keydown="onTabKeydown">
+        <button
+          v-for="name in TABS"
+          :id="`chat-tab-${name}`"
+          :key="name"
+          ref="tabButtons"
+          type="button"
+          role="tab"
+          :aria-selected="tab === name"
+          :aria-controls="`chat-tabpanel-${name}`"
+          :tabindex="tab === name ? 0 : -1"
+          class="border-b-[3px] px-3 py-1.5 text-sm font-semibold"
+          :class="tab === name ? 'border-linden text-espresso' : 'border-transparent text-steam hover:text-espresso'"
+          @click="selectTab(name)"
+        >
+          {{ t(`chat.tabs.${name}`) }}
+        </button>
+      </div>
+
+      <div v-show="tab === 'ai'" id="chat-tabpanel-ai" role="tabpanel" aria-labelledby="chat-tab-ai" class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-6">
+        <p class="font-display text-lg font-bold">{{ t('chat.ai.title') }}</p>
+        <p class="text-[15.5px]">{{ t('chat.ai.text') }}</p>
+        <p class="rounded-xl border border-dashed border-line px-3 py-2 text-sm text-steam">{{ t('chat.ai.note') }}</p>
+        <button type="button" class="self-start rounded-full border-2 border-cobalt bg-white px-3 py-1 text-sm font-semibold text-cobalt" @click="selectTab('scripted', true)">
+          {{ t('chat.ai.toScripted') }}
+        </button>
+      </div>
+
+      <div v-show="tab === 'scripted'" id="chat-tabpanel-scripted" role="tabpanel" aria-labelledby="chat-tab-scripted" class="flex min-h-0 flex-1 flex-col">
+
       <!-- Start: demo note + bot check (ADR-024: the guest learns that the admin shows chats) -->
       <div v-if="phase === 'check'" class="flex flex-col gap-3 overflow-y-auto px-4 py-5">
         <p class="rounded-xl border border-dashed border-line px-3 py-2 text-sm text-steam">{{ t('chat.demoNote') }}</p>
@@ -293,6 +343,7 @@ onBeforeUnmount(() => (document.documentElement.style.overflow = ''))
           </form>
         </template>
       </template>
+      </div>
     </section>
   </div>
 </template>
