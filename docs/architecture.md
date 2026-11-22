@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **target architecture; v1–v6 implemented, v7 planned** (2026-11-22). Parts are marked with the
+Status: **target architecture; v1–v7 implemented** (2026-11-22). Parts are marked with the
 version that introduces them. This file is updated at the end of every version to reflect
 what actually exists.
 
@@ -277,7 +277,7 @@ Learned in v6:
   patterns, names cannot — be honest about it in the notice instead (R3).
 - `Date.now()` at a Worker's module scope reads 1970; compute dates inside handlers.
 
-## Pre-order with prepayment (v7) — planned
+## Pre-order with prepayment (v7) — implemented
 
 Plan: `docs/plans/v7-plan.md`. Contract: `docs/api.md` → Pre-order and prepayment. Decisions:
 ADR-028, ADR-029.
@@ -289,3 +289,23 @@ ADR-028, ADR-029.
 - Web: a pre-order block on the reservation page (menu, totals with 20% off, "Pay" → Stripe's
   page → back); payment states; reminders at booking; admin paid tag and order.
 - Secrets: `STRIPE_SECRET_KEY` (`sk_test_…`), `STRIPE_WEBHOOK_SECRET`.
+- Payment: euros at a demo rate of 1 € = 50 ₴ (the test account is German, R1), cards only (R2),
+  the café's name set on each Checkout Session.
+
+Learned in v7:
+- The hosted-payment pattern is the same everywhere: create a payment on the server from server-side
+  prices, send the guest to the provider, learn the result from a signed notification, keep our own
+  status. Stripe, monobank and LiqPay differ only in names.
+- Learn about a payment in two independent ways (webhook and a check on return) and make every status
+  change conditional, so repeated, late or missing notifications are all harmless.
+- A payment and a cancel can race. Decide inside one conditional UPDATE ("paid only while the booking
+  is live"), not on an earlier read; whatever loses the race gets refunded (R3).
+- Judge a late payment by what the guest could do when they started paying, not by when the news
+  arrives: a provider page stays open for at least 30 minutes (R3).
+- Keep secrets that grant access out of third parties: the return URL carries no reservation token;
+  the page keeps it in sessionStorage while the guest is on Stripe's page.
+- Stripe's API changes fast: `payment_method_types` was removed for Checkout Sessions in API version
+  `2026-09-30` (now `allowed_payment_method_types`); the SDK's types caught it, the fake in tests did not.
+- An account registered for test mode only cannot change account-level settings (sandbox name) without
+  verifying a business; per-session settings (`branding_settings`) are the way around.
+- `wrangler dev` can keep a stale environment after `.dev.vars` changes while it runs: restart it.

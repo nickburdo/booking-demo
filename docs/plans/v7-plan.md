@@ -1,6 +1,6 @@
 # v7 plan — Pre-order with prepayment in Stripe test mode
 
-- **Status:** Approved (2026-11-22) — in progress
+- **Status:** Done (2026-11-22) — live; revisions R1–R3
 - **Scope:** stage v7 of the roadmap (`docs/overview.md`): the bridge from booking to purchase. After
   the café **confirms** a booking, the guest can **pre-order dishes** from the menu on the private
   reservation page and **pay online with a 20% discount**. Payment runs on **Stripe Checkout in test
